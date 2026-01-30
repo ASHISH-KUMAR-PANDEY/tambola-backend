@@ -9,6 +9,7 @@ import {
   type UpdateGameStatusInput,
 } from './games.schema.js';
 import { redis } from '../../database/redis.js';
+import { getIO } from '../../websocket/io.js';
 
 export async function createGame(
   request: FastifyRequest,
@@ -97,6 +98,19 @@ export async function getGame(
     const playerCount = await Player.countDocuments({ gameId });
     const winnerCount = await Winner.countDocuments({ gameId });
 
+    // Get winners with player details
+    const winners = await Winner.find({ gameId }).lean();
+    const winnersWithDetails = await Promise.all(
+      winners.map(async (winner) => {
+        const player = await Player.findById(winner.playerId).lean();
+        return {
+          playerId: winner.playerId,
+          category: winner.category,
+          userName: player?.userName || 'Unknown',
+        };
+      })
+    );
+
     await reply.send({
       id: game._id.toString(),
       scheduledTime: game.scheduledTime,
@@ -109,6 +123,7 @@ export async function getGame(
       currentNumber: game.currentNumber,
       playerCount,
       winnerCount,
+      winners: winnersWithDetails,
       createdAt: game.createdAt,
       updatedAt: game.updatedAt,
     });
@@ -260,6 +275,18 @@ export async function deleteGame(
         'Cannot delete game that has started',
         400
       );
+    }
+
+    // Notify all players in the game room before deletion
+    try {
+      const io = getIO();
+      io.to(`game:${gameId}`).emit('game:deleted', {
+        gameId,
+        message: 'Game has been deleted by the organizer',
+      });
+    } catch (error) {
+      // Log error but continue with deletion
+      console.error('Failed to emit game:deleted event:', error);
     }
 
     // Delete related documents

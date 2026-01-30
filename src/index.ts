@@ -60,6 +60,10 @@ const io = new SocketIOServer(fastify.server, {
   pingTimeout: 5000,
 });
 
+// Make io available globally for controllers
+import { setIO } from './websocket/io.js';
+setIO(io);
+
 // Socket.IO middleware for authentication
 io.use(async (socket, next) => {
   try {

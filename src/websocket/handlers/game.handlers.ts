@@ -45,6 +45,48 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       return;
     }
 
+    // Allow game creator (organizer) to join as observer without player record
+    if (game.createdBy === userId) {
+      socket.join(`game:${gameId}`);
+
+      // Get all players and winners
+      const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
+      const winners = await Winner.find({ gameId }).select('playerId category').lean();
+
+      // Get user details for winners
+      const winnersWithDetails = await Promise.all(
+        winners.map(async (w) => {
+          const player = await Player.findById(w.playerId).lean();
+          return {
+            playerId: w.playerId,
+            category: w.category,
+            userName: player?.userName || 'Unknown',
+          };
+        })
+      );
+
+      // Send game:joined without playerId/ticket (organizer is observer)
+      socket.emit('game:joined', {
+        gameId,
+        playerId: null,
+        ticket: null,
+      });
+
+      // Send current game state
+      socket.emit('game:stateSync', {
+        calledNumbers: game.calledNumbers || [],
+        currentNumber: game.currentNumber,
+        players: allPlayers.map((p) => ({
+          playerId: p._id.toString(),
+          userName: p.userName,
+        })),
+        winners: winnersWithDetails,
+      });
+
+      logger.info({ gameId, userId, role: 'organizer' }, 'Organizer joined game as observer');
+      return;
+    }
+
     // Check if player already joined
     const existingPlayer = await Player.findOne({ gameId, userId });
 
