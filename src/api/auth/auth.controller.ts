@@ -29,12 +29,14 @@ export async function signup(
       email: body.email,
       password: hashedPassword,
       name: body.name,
+      role: body.role || 'PLAYER',
     });
 
     // Generate JWT token
     const token = request.server.jwt.sign({
       userId: user._id.toString(),
       email: user.email,
+      role: user.role,
     });
 
     await reply.status(201).send({
@@ -42,6 +44,7 @@ export async function signup(
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        role: user.role,
         createdAt: user.createdAt,
       },
       token,
@@ -82,6 +85,7 @@ export async function login(
     const token = request.server.jwt.sign({
       userId: user._id.toString(),
       email: user.email,
+      role: user.role,
     });
 
     await reply.send({
@@ -89,6 +93,7 @@ export async function login(
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        role: user.role,
         createdAt: user.createdAt,
       },
       token,
@@ -109,7 +114,7 @@ export async function me(
   try {
     const decoded = (await request.jwtVerify()) as any;
 
-    const user = await User.findById(decoded.userId).select('email name createdAt');
+    const user = await User.findById(decoded.userId).select('email name role createdAt');
 
     if (!user) {
       throw new AppError('USER_NOT_FOUND', 'User not found', 404);
@@ -120,6 +125,7 @@ export async function me(
         id: user._id.toString(),
         email: user.email,
         name: user.name,
+        role: user.role,
         createdAt: user.createdAt,
       },
     });

@@ -1,10 +1,16 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export enum UserRole {
+  PLAYER = 'PLAYER',
+  ORGANIZER = 'ORGANIZER',
+}
+
 export interface IUser extends Document {
   _id: string;
   email: string;
   password: string;
   name: string;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +30,11 @@ const userSchema = new Schema<IUser>(
     name: {
       type: String,
       required: true,
+    },
+    role: {
+      type: String,
+      enum: Object.values(UserRole),
+      default: UserRole.PLAYER,
     },
   },
   {
