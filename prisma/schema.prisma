@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum GameStatus {
+  LOBBY
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum WinCategory {
+  EARLY_5
+  TOP_LINE
+  MIDDLE_LINE
+  BOTTOM_LINE
+  FULL_HOUSE
+}
+
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD_LETTER
+}
+
+// Models
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model Game {
+  id            String      @id @default(uuid())
+  scheduledTime DateTime
+  startedAt     DateTime?
+  endedAt       DateTime?
+  status        GameStatus  @default(LOBBY)
+  createdBy     String
+  prizes        Json
+  calledNumbers Int[]       @default([])
+  currentNumber Int?
+  players       Player[]
+  winners       Winner[]
+  prizeQueue    PrizeQueue[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([scheduledTime, status])
+  @@index([createdBy])
+}
+
+model Player {
+  id        String   @id @default(uuid())
+  gameId    String
+  userId    String
+  userName  String
+  ticket    Json     // Store full 3x9 grid structure as JSON
+  joinedAt  DateTime @default(now())
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  winners   Winner[]
+
+  @@unique([gameId, userId])
+  @@index([gameId, userId])
+}
+
+model Winner {
+  id           String      @id @default(uuid())
+  gameId       String
+  playerId     String
+  category     WinCategory
+  claimedAt    DateTime    @default(now())
+  prizeClaimed Boolean     @default(false)
+  prizeValue   Json?
+  game         Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player       Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([gameId, category])
+  @@index([prizeClaimed])
+}
+
+model PrizeQueue {
+  id             String      @id @default(uuid())
+  userId         String
+  gameId         String
+  category       WinCategory
+  prizeValue     Json
+  status         QueueStatus @default(PENDING)
+  attempts       Int         @default(0)
+  lastAttempt    DateTime?
+  error          String?
+  idempotencyKey String?     // Track external API idempotency
+  game           Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([userId, gameId, category])  // Prevent duplicate prize entries
+  @@index([status, createdAt])
+  @@index([userId])
+}
