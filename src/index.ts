@@ -138,6 +138,18 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('game:markNumber', async (payload) => {
+    try {
+      await gameHandlers.handleMarkNumber(socket, payload);
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'game:markNumber' }, 'Event handler error');
+      socket.emit('error', {
+        code: 'HANDLER_ERROR',
+        message: 'Failed to process game:markNumber event',
+      });
+    }
+  });
+
   socket.on('game:claimWin', async (payload) => {
     try {
       await gameHandlers.handleClaimWin(socket, payload);

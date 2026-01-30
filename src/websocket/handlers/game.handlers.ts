@@ -23,6 +23,12 @@ const claimWinSchema = z.object({
   category: z.enum(['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE']),
 });
 
+const markNumberSchema = z.object({
+  gameId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  playerId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  number: z.number().int().min(1).max(90),
+});
+
 /**
  * Handle player joining a game
  */
@@ -31,7 +37,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     const { gameId } = joinGameSchema.parse(payload);
     const userId = socket.data.userId as string;
 
-    // Check if game exists and is in LOBBY status
+    // Check if game exists
     const game = await Game.findById(gameId);
 
     if (!game) {
@@ -39,7 +45,11 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       return;
     }
 
-    if (game.status !== GameStatus.LOBBY) {
+    // Check if player already joined
+    const existingPlayer = await Player.findOne({ gameId, userId });
+
+    // If game is not in LOBBY, only allow if player already joined (rejoining)
+    if (game.status !== GameStatus.LOBBY && !existingPlayer) {
       socket.emit('error', {
         code: 'GAME_ALREADY_STARTED',
         message: 'Cannot join game that has already started',
@@ -47,17 +57,34 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       return;
     }
 
-    // Check if player already joined
-    const existingPlayer = await Player.findOne({ gameId, userId });
-
     if (existingPlayer) {
-      // Player already joined, just join the socket room
+      // Player rejoining - send full game state
       socket.join(`game:${gameId}`);
+
+      // Get all players in the game
+      const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
+
+      // Get all winners
+      const winners = await Winner.find({ gameId }).select('playerId category').lean();
 
       socket.emit('game:joined', {
         gameId,
         playerId: existingPlayer._id.toString(),
         ticket: existingPlayer.ticket,
+      });
+
+      // Send current game state for rejoining player
+      socket.emit('game:stateSync', {
+        calledNumbers: game.calledNumbers || [],
+        currentNumber: game.currentNumber,
+        players: allPlayers.map((p) => ({
+          playerId: p._id.toString(),
+          userName: p.userName,
+        })),
+        winners: winners.map((w) => ({
+          playerId: w.playerId,
+          category: w.category,
+        })),
       });
 
       logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined game');
@@ -84,11 +111,30 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
         if (existingPlayer) {
           socket.join(`game:${gameId}`);
+
+          // Get all players and winners for state sync
+          const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
+          const winners = await Winner.find({ gameId }).select('playerId category').lean();
+
           socket.emit('game:joined', {
             gameId,
             playerId: existingPlayer._id.toString(),
             ticket: existingPlayer.ticket,
           });
+
+          socket.emit('game:stateSync', {
+            calledNumbers: game.calledNumbers || [],
+            currentNumber: game.currentNumber,
+            players: allPlayers.map((p) => ({
+              playerId: p._id.toString(),
+              userName: p.userName,
+            })),
+            winners: winners.map((w) => ({
+              playerId: w.playerId,
+              category: w.category,
+            })),
+          });
+
           logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined after race');
           return;
         }
@@ -403,6 +449,59 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
     socket.emit('error', {
       code: 'CLAIM_FAILED',
       message: error instanceof Error ? error.message : 'Failed to claim win',
+    });
+  }
+}
+
+/**
+ * Handle player manually marking a number
+ */
+export async function handleMarkNumber(socket: Socket, payload: unknown): Promise<void> {
+  try {
+    const { gameId, playerId, number } = markNumberSchema.parse(payload);
+    const userId = socket.data.userId as string;
+
+    // Verify player owns this ticket
+    const player = await Player.findOne({ _id: playerId, gameId, userId });
+
+    if (!player) {
+      socket.emit('error', { code: 'INVALID_PLAYER', message: 'Invalid player or ticket' });
+      return;
+    }
+
+    // Get game to check if number was called
+    const game = await Game.findById(gameId);
+
+    if (!game) {
+      socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+      return;
+    }
+
+    // Verify number was called
+    if (!game.calledNumbers.includes(number)) {
+      socket.emit('error', { code: 'NUMBER_NOT_CALLED', message: 'Number not called yet' });
+      return;
+    }
+
+    // Update marked numbers in Redis
+    const key = `game:${gameId}:player:${playerId}:ticket`;
+    const markedNumbersStr = await redis.hget(key, 'markedNumbers');
+    const markedNumbers: number[] = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
+
+    if (!markedNumbers.includes(number)) {
+      markedNumbers.push(number);
+      await redis.hmset(key, {
+        markedNumbers: JSON.stringify(markedNumbers),
+        markedCount: markedNumbers.length.toString(),
+      });
+
+      logger.info({ gameId, playerId, number, total: markedNumbers.length }, 'Player marked number');
+    }
+  } catch (error) {
+    logger.error({ error, socketId: socket.id }, 'game:markNumber handler error');
+    socket.emit('error', {
+      code: 'MARK_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to mark number',
     });
   }
 }

@@ -8,6 +8,7 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.post('/', gamesController.createGame);
   fastify.get('/', gamesController.listGames);
+  fastify.get('/my-active', gamesController.getMyActiveGames);
   fastify.get('/:gameId', gamesController.getGame);
   fastify.patch('/:gameId/status', gamesController.updateGameStatus);
   fastify.delete('/:gameId', gamesController.deleteGame);

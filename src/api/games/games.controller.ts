@@ -8,6 +8,7 @@ import {
   type CreateGameInput,
   type UpdateGameStatusInput,
 } from './games.schema.js';
+import { redis } from '../../database/redis.js';
 
 export async function createGame(
   request: FastifyRequest,
@@ -168,6 +169,67 @@ export async function updateGameStatus(
     }
 
     throw new AppError('UPDATE_GAME_FAILED', 'Failed to update game', 500);
+  }
+}
+
+export async function getMyActiveGames(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const authReq = request as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+
+    // Find all games the player has joined that are still active or in lobby
+    const playerRecords = await Player.find({ userId }).select('gameId ticket').lean();
+
+    if (playerRecords.length === 0) {
+      await reply.send({ games: [] });
+      return;
+    }
+
+    const gameIds = playerRecords.map((p) => p.gameId);
+
+    // Get games that are still LOBBY or ACTIVE
+    const games = await Game.find({
+      _id: { $in: gameIds },
+      status: { $in: [GameStatus.LOBBY, GameStatus.ACTIVE] },
+    })
+      .select('scheduledTime startedAt status prizes calledNumbers currentNumber')
+      .sort({ scheduledTime: -1 })
+      .lean();
+
+    // Attach player's ticket and marked numbers to each game
+    const gamesWithTickets = await Promise.all(
+      games.map(async (game) => {
+        const playerRecord = playerRecords.find((p) => p.gameId === game._id.toString());
+
+        // Fetch marked numbers from Redis
+        let markedNumbers: number[] = [];
+        if (playerRecord) {
+          const key = `game:${game._id.toString()}:player:${playerRecord._id.toString()}:ticket`;
+          const markedNumbersStr = await redis.hget(key, 'markedNumbers');
+          markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
+        }
+
+        return {
+          id: game._id.toString(),
+          scheduledTime: game.scheduledTime,
+          startedAt: game.startedAt,
+          status: game.status,
+          prizes: game.prizes,
+          calledNumbers: game.calledNumbers || [],
+          currentNumber: game.currentNumber,
+          ticket: playerRecord?.ticket,
+          playerId: playerRecord?._id?.toString(),
+          markedNumbers,
+        };
+      })
+    );
+
+    await reply.send({ games: gamesWithTickets });
+  } catch (error) {
+    throw new AppError('GET_ACTIVE_GAMES_FAILED', 'Failed to get active games', 500);
   }
 }
 
