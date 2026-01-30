@@ -50,7 +50,7 @@ export async function listGames(
 
     const filter = status ? { status: status as any } : {};
     const games = await Game.find(filter)
-      .select('scheduledTime startedAt endedAt status prizes calledNumbers currentNumber')
+      .select('scheduledTime startedAt endedAt status prizes calledNumbers currentNumber createdBy')
       .sort({ scheduledTime: -1 })
       .limit(50)
       .lean();
@@ -68,6 +68,7 @@ export async function listGames(
           prizes: game.prizes,
           calledNumbers: game.calledNumbers,
           currentNumber: game.currentNumber,
+          createdBy: game.createdBy,
           playerCount,
         };
       })
