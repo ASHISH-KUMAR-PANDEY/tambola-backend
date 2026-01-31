@@ -171,6 +171,16 @@ export async function updateGameStatus(
       .select('scheduledTime startedAt endedAt status prizes')
       .lean();
 
+    // If game is being completed, notify all players in the room
+    if (body.status === 'COMPLETED') {
+      try {
+        const io = getIO();
+        io.to(`game:${gameId}`).emit('game:completed', { gameId });
+      } catch (error) {
+        console.error('Failed to emit game:completed event:', error);
+      }
+    }
+
     await reply.send({
       id: updatedGame?._id.toString(),
       scheduledTime: updatedGame?.scheduledTime,
