@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IPromotionalBanner extends Document {
   _id: string;
   imageUrl: string;
-  s3Key: string;
+  s3Key?: string; // Optional - only set when using S3 storage
   uploadedBy: string;
   width: number;
   height: number;
@@ -20,7 +20,7 @@ const promotionalBannerSchema = new Schema<IPromotionalBanner>(
     },
     s3Key: {
       type: String,
-      required: true,
+      required: false, // Optional - only set when using S3 storage
     },
     uploadedBy: {
       type: String,
