@@ -56,10 +56,12 @@ fastify.get('/health', async () => {
 import { authRoutes } from './api/auth/auth.routes.js';
 import { gamesRoutes } from './api/games/games.routes.js';
 import { promotionalBannerRoutes } from './api/promotional-banner/promotional-banner.routes.js';
+import { youTubeEmbedRoutes } from './api/youtube-embed/youtube-embed.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
 await fastify.register(promotionalBannerRoutes, { prefix: '/api/v1/promotional-banner' });
+await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
 
 // Socket.IO setup
 const io = new SocketIOServer(fastify.server, {
