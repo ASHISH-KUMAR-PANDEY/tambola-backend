@@ -2,11 +2,13 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import fastifyStatic from '@fastify/static';
 import { Server as SocketIOServer } from 'socket.io';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './utils/error.js';
 import { connectDatabase, disconnectDatabase } from './database/client.js';
 import { redis } from './database/redis.js';
+import { getUploadsDir } from './services/localStorage.service.js';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -33,6 +35,13 @@ await fastify.register(cors, {
 // Register JWT
 await fastify.register(jwt, {
   secret: JWT_SECRET,
+});
+
+// Register static file serving for uploads
+await fastify.register(fastifyStatic, {
+  root: getUploadsDir(),
+  prefix: '/uploads/',
+  decorateReply: false,
 });
 
 // Set global error handler

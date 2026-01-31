@@ -12,6 +12,22 @@ const s3Client = new S3Client({
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'tambola-promotional-images';
 
+/**
+ * Check if AWS S3 is properly configured
+ */
+export function isS3Configured(): boolean {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID || '';
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || '';
+
+  // Check if credentials are not empty and not placeholder values
+  return (
+    accessKeyId !== '' &&
+    secretAccessKey !== '' &&
+    !accessKeyId.startsWith('YOUR_') &&
+    !secretAccessKey.startsWith('YOUR_')
+  );
+}
+
 export async function uploadToS3(
   fileBuffer: Buffer,
   fileName: string,

@@ -3,7 +3,9 @@ import sharp from 'sharp';
 import { PromotionalBanner } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { uploadToS3, deleteFromS3, extractS3Key } from '../../services/s3.service.js';
+import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured } from '../../services/s3.service.js';
+import { uploadToLocal, deleteFromLocal } from '../../services/localStorage.service.js';
+import { logger } from '../../utils/logger.js';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ASPECT_RATIO = 16 / 9;
@@ -56,22 +58,36 @@ export async function uploadBanner(
       );
     }
 
-    // Upload to S3
-    const imageUrl = await uploadToS3(
-      buffer,
-      data.filename,
-      data.mimetype
-    );
+    // Check if S3 is configured, otherwise use local storage
+    const useS3 = isS3Configured();
+    let imageUrl: string;
+    let s3Key: string | null = null;
+    let storageType: 'S3' | 'LOCAL';
 
-    const s3Key = extractS3Key(imageUrl);
+    if (useS3) {
+      logger.info('Using S3 storage for banner upload');
+      imageUrl = await uploadToS3(buffer, data.filename, data.mimetype);
+      s3Key = extractS3Key(imageUrl);
+      storageType = 'S3';
+    } else {
+      logger.info('S3 not configured, using local storage for banner upload');
+      imageUrl = await uploadToLocal(buffer, data.filename, data.mimetype);
+      storageType = 'LOCAL';
+    }
 
     // Delete old banner if exists
     const existingBanner = await PromotionalBanner.findOne();
     if (existingBanner) {
       try {
-        await deleteFromS3(existingBanner.s3Key);
+        if (existingBanner.s3Key) {
+          // Old banner was stored in S3
+          await deleteFromS3(existingBanner.s3Key);
+        } else {
+          // Old banner was stored locally
+          await deleteFromLocal(existingBanner.imageUrl);
+        }
       } catch (error) {
-        console.error('Failed to delete old banner from S3:', error);
+        logger.error({ error }, 'Failed to delete old banner');
       }
       await PromotionalBanner.deleteOne({ _id: existingBanner._id });
     }
@@ -79,7 +95,7 @@ export async function uploadBanner(
     // Save new banner to database
     const banner = await PromotionalBanner.create({
       imageUrl,
-      s3Key,
+      s3Key: s3Key || undefined,
       uploadedBy: authReq.user.userId,
       width,
       height,
@@ -141,11 +157,17 @@ export async function deleteBanner(
       throw new AppError('BANNER_NOT_FOUND', 'No promotional banner found', 404);
     }
 
-    // Delete from S3
+    // Delete from storage (S3 or local)
     try {
-      await deleteFromS3(banner.s3Key);
+      if (banner.s3Key) {
+        // Banner is stored in S3
+        await deleteFromS3(banner.s3Key);
+      } else {
+        // Banner is stored locally
+        await deleteFromLocal(banner.imageUrl);
+      }
     } catch (error) {
-      console.error('Failed to delete banner from S3:', error);
+      logger.error({ error }, 'Failed to delete banner from storage');
     }
 
     // Delete from database
