@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { YouTubeEmbed } from '../../models/index.js';
+import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { logger } from '../../utils/logger.js';
@@ -53,22 +53,26 @@ export async function setYouTubeEmbed(
     }
 
     // Delete old embed if exists (only one active embed at a time)
-    const existingEmbed = await YouTubeEmbed.findOne();
+    const existingEmbed = await prisma.youTubeEmbed.findFirst();
     if (existingEmbed) {
-      await YouTubeEmbed.deleteOne({ _id: existingEmbed._id });
+      await prisma.youTubeEmbed.delete({
+        where: { id: existingEmbed.id },
+      });
     }
 
     // Save new embed to database
-    const embed = await YouTubeEmbed.create({
-      videoUrl,
-      embedId,
-      uploadedBy: authReq.user.userId,
+    const embed = await prisma.youTubeEmbed.create({
+      data: {
+        videoId: embedId,
+        videoUrl,
+        embedId,
+      },
     });
 
     logger.info({ embedId, videoUrl }, 'YouTube embed set');
 
     await reply.status(201).send({
-      id: embed._id.toString(),
+      id: embed.id,
       videoUrl: embed.videoUrl,
       embedId: embed.embedId,
       createdAt: embed.createdAt,
@@ -88,7 +92,9 @@ export async function getCurrentYouTubeEmbed(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const embed = await YouTubeEmbed.findOne().sort({ createdAt: -1 }).lean();
+    const embed = await prisma.youTubeEmbed.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (!embed) {
       await reply.send({ embed: null });
@@ -97,7 +103,7 @@ export async function getCurrentYouTubeEmbed(
 
     await reply.send({
       embed: {
-        id: embed._id.toString(),
+        id: embed.id,
         videoUrl: embed.videoUrl,
         embedId: embed.embedId,
         createdAt: embed.createdAt,
@@ -114,14 +120,16 @@ export async function deleteYouTubeEmbed(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const embed = await YouTubeEmbed.findOne();
+    const embed = await prisma.youTubeEmbed.findFirst();
 
     if (!embed) {
       throw new AppError('EMBED_NOT_FOUND', 'No YouTube embed found', 404);
     }
 
     // Delete from database
-    await YouTubeEmbed.deleteOne({ _id: embed._id });
+    await prisma.youTubeEmbed.delete({
+      where: { id: embed.id },
+    });
 
     logger.info({ embedId: embed.embedId }, 'YouTube embed deleted');
 

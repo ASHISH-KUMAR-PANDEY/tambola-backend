@@ -1,7 +1,6 @@
 import type { Socket } from 'socket.io';
 import { z } from 'zod';
-import mongoose from 'mongoose';
-import { Game, Player, Winner, User, GameStatus } from '../../models/index.js';
+import { prisma, GameStatus } from '../../models/index.js';
 import { redis } from '../../database/redis.js';
 import { logger } from '../../utils/logger.js';
 import { generateTicket, getTicketNumbers } from '../../services/ticket.service.js';
@@ -11,22 +10,22 @@ import * as prizeService from '../../services/prize.service.js';
 
 // Validation schemas
 const joinGameSchema = z.object({
-  gameId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  gameId: z.string().uuid('Invalid UUID'),
 });
 
 const callNumberSchema = z.object({
-  gameId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  gameId: z.string().uuid('Invalid UUID'),
   number: z.number().int().min(1).max(90),
 });
 
 const claimWinSchema = z.object({
-  gameId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  gameId: z.string().uuid('Invalid UUID'),
   category: z.enum(['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE']),
 });
 
 const markNumberSchema = z.object({
-  gameId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
-  playerId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId'),
+  gameId: z.string().uuid('Invalid UUID'),
+  playerId: z.string().uuid('Invalid UUID'),
   number: z.number().int().min(1).max(90),
 });
 
@@ -39,7 +38,9 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     const userId = socket.data.userId as string;
 
     // Check if game exists
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
@@ -51,13 +52,21 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       socket.join(`game:${gameId}`);
 
       // Get all players and winners
-      const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
-      const winners = await Winner.find({ gameId }).select('playerId category').lean();
+      const allPlayers = await prisma.player.findMany({
+        where: { gameId },
+        select: { id: true, userName: true },
+      });
+      const winners = await prisma.winner.findMany({
+        where: { gameId },
+        select: { playerId: true, category: true },
+      });
 
       // Get user details for winners
       const winnersWithDetails = await Promise.all(
         winners.map(async (w) => {
-          const player = await Player.findById(w.playerId).lean();
+          const player = await prisma.player.findUnique({
+            where: { id: w.playerId },
+          });
           return {
             playerId: w.playerId,
             category: w.category,
@@ -78,7 +87,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         calledNumbers: game.calledNumbers || [],
         currentNumber: game.currentNumber,
         players: allPlayers.map((p) => ({
-          playerId: p._id.toString(),
+          playerId: p.id,
           userName: p.userName,
         })),
         winners: winnersWithDetails,
@@ -89,7 +98,14 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     }
 
     // Check if player already joined
-    const existingPlayer = await Player.findOne({ gameId, userId });
+    const existingPlayer = await prisma.player.findUnique({
+      where: {
+        gameId_userId: {
+          gameId,
+          userId,
+        },
+      },
+    });
 
     // If game is not in LOBBY, only allow if player already joined (rejoining)
     if (game.status !== GameStatus.LOBBY && !existingPlayer) {
@@ -105,14 +121,20 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       socket.join(`game:${gameId}`);
 
       // Get all players in the game
-      const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
+      const allPlayers = await prisma.player.findMany({
+        where: { gameId },
+        select: { id: true, userName: true },
+      });
 
       // Get all winners
-      const winnersData = await Winner.find({ gameId }).select('playerId category').lean();
+      const winnersData = await prisma.winner.findMany({
+        where: { gameId },
+        select: { playerId: true, category: true },
+      });
 
       // Map winners with userName from players
       const winners = winnersData.map((w) => {
-        const player = allPlayers.find((p) => p._id.toString() === w.playerId);
+        const player = allPlayers.find((p) => p.id === w.playerId);
         return {
           playerId: w.playerId,
           category: w.category,
@@ -122,12 +144,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
       socket.emit('game:joined', {
         gameId,
-        playerId: existingPlayer._id.toString(),
+        playerId: existingPlayer.id,
         ticket: existingPlayer.ticket,
       });
 
       // Fetch markedNumbers from Redis for the rejoining player
-      const ticketKey = `game:${gameId}:player:${existingPlayer._id.toString()}:ticket`;
+      const ticketKey = `game:${gameId}:player:${existingPlayer.id}:ticket`;
       const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
       const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
@@ -136,7 +158,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         calledNumbers: game.calledNumbers || [],
         currentNumber: game.currentNumber,
         players: allPlayers.map((p) => ({
-          playerId: p._id.toString(),
+          playerId: p.id,
           userName: p.userName,
         })),
         winners: winners,
@@ -145,7 +167,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
       console.log('[StateSync] Sending to rejoining player:', {
         gameId,
-        playerId: existingPlayer._id.toString(),
+        playerId: existingPlayer.id,
         winnersCount: winners.length,
         winners: winners,
         markedNumbersCount: markedNumbers.length,
@@ -153,7 +175,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
       socket.emit('game:stateSync', stateSyncData);
 
-      logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined game');
+      logger.info({ gameId, userId, playerId: existingPlayer.id }, 'Player rejoined game');
       return;
     }
 
@@ -163,12 +185,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Get userName - try to fetch from User collection, fallback to userId
     let userName = `Player ${userId.slice(-4)}`;
     try {
-      // Only query User model if userId is a valid ObjectId (not mobile app user)
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        const user = await User.findById(userId).select('name email').lean();
-        if (user) {
-          userName = user.name || user.email;
-        }
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+      if (user) {
+        userName = user.name || user.email;
       }
     } catch (err) {
       // User might not exist (mobile app users), use default
@@ -177,28 +199,43 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     let player;
     try {
       // Create player record (store full grid as JSON)
-      player = await Player.create({
-        gameId,
-        userId,
-        userName,
-        ticket: ticketGrid,  // Store as JSON grid
+      player = await prisma.player.create({
+        data: {
+          gameId,
+          userId,
+          userName,
+          ticket: ticketGrid,  // Store as JSON grid
+        },
       });
     } catch (error: any) {
       // Handle race condition: player already joined in another tab
-      if (error.code === 11000) {
-        // Duplicate key error - player already exists
-        const existingPlayer = await Player.findOne({ gameId, userId });
+      if (error.code === 'P2002') {
+        // Unique constraint violation - player already exists
+        const existingPlayer = await prisma.player.findUnique({
+          where: {
+            gameId_userId: {
+              gameId,
+              userId,
+            },
+          },
+        });
 
         if (existingPlayer) {
           socket.join(`game:${gameId}`);
 
           // Get all players and winners for state sync
-          const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
-          const winnersData = await Winner.find({ gameId }).select('playerId category').lean();
+          const allPlayers = await prisma.player.findMany({
+            where: { gameId },
+            select: { id: true, userName: true },
+          });
+          const winnersData = await prisma.winner.findMany({
+            where: { gameId },
+            select: { playerId: true, category: true },
+          });
 
           // Map winners with userName from players
           const winners = winnersData.map((w) => {
-            const player = allPlayers.find((p) => p._id.toString() === w.playerId);
+            const player = allPlayers.find((p) => p.id === w.playerId);
             return {
               playerId: w.playerId,
               category: w.category,
@@ -208,12 +245,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
           socket.emit('game:joined', {
             gameId,
-            playerId: existingPlayer._id.toString(),
+            playerId: existingPlayer.id,
             ticket: existingPlayer.ticket,
           });
 
           // Fetch markedNumbers from Redis for the rejoining player
-          const ticketKey = `game:${gameId}:player:${existingPlayer._id.toString()}:ticket`;
+          const ticketKey = `game:${gameId}:player:${existingPlayer.id}:ticket`;
           const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
           const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
@@ -221,14 +258,14 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
             calledNumbers: game.calledNumbers || [],
             currentNumber: game.currentNumber,
             players: allPlayers.map((p) => ({
-              playerId: p._id.toString(),
+              playerId: p.id,
               userName: p.userName,
             })),
             winners: winners,
             markedNumbers: markedNumbers, // Include player's marked numbers
           });
 
-          logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined after race');
+          logger.info({ gameId, userId, playerId: existingPlayer.id }, 'Player rejoined after race');
           return;
         }
       }
@@ -238,7 +275,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Initialize ticket in Redis
     await winDetection.initializePlayerTicket(
       gameId,
-      player._id.toString(),
+      player.id,
       userId,
       ticketGrid  // Pass grid structure
     );
@@ -252,17 +289,17 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Send ticket to player
     socket.emit('game:joined', {
       gameId,
-      playerId: player._id.toString(),
+      playerId: player.id,
       ticket: player.ticket,
     });
 
     // Broadcast to room that a player joined
     socket.to(`game:${gameId}`).emit('game:playerJoined', {
-      playerId: player._id.toString(),
+      playerId: player.id,
       userName: player.userName,
     });
 
-    logger.info({ gameId, userId, playerId: player._id.toString() }, 'Player joined game');
+    logger.info({ gameId, userId, playerId: player.id }, 'Player joined game');
   } catch (error) {
     logger.error({ error, socketId: socket.id }, 'game:join handler error');
     socket.emit('error', {
@@ -302,7 +339,9 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     const userId = socket.data.userId as string;
 
     // Verify user is game creator
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
@@ -326,7 +365,9 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     }
 
     // Check minimum players
-    const playerCount = await Player.countDocuments({ gameId });
+    const playerCount = await prisma.player.count({
+      where: { gameId },
+    });
 
     if (playerCount === 0) {
       socket.emit('error', {
@@ -365,7 +406,9 @@ export async function handleCallNumber(socket: Socket, payload: unknown): Promis
     const userId = socket.data.userId as string;
 
     // Verify user is game creator
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game || game.createdBy !== userId) {
       socket.emit('error', {
@@ -384,7 +427,8 @@ export async function handleCallNumber(socket: Socket, payload: unknown): Promis
     }
 
     // Check if number already called
-    if (game.calledNumbers.includes(number)) {
+    const calledNumbers = game.calledNumbers as number[];
+    if (calledNumbers.includes(number)) {
       socket.emit('error', {
         code: 'NUMBER_ALREADY_CALLED',
         message: `Number ${number} has already been called`,
@@ -418,7 +462,9 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
     const userId = socket.data.userId as string;
 
     // Get game
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
@@ -431,7 +477,14 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
     }
 
     // Get player
-    const player = await Player.findOne({ gameId, userId });
+    const player = await prisma.player.findUnique({
+      where: {
+        gameId_userId: {
+          gameId,
+          userId,
+        },
+      },
+    });
 
     if (!player) {
       socket.emit('error', { code: 'PLAYER_NOT_FOUND', message: 'You are not in this game' });
@@ -450,7 +503,7 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
 
     // Validate the claim
     const ticket = player.ticket as number[][];
-    const calledNumbers = game.calledNumbers;
+    const calledNumbers = game.calledNumbers as number[];
 
     const isValid = validateClaim(ticket, calledNumbers, category);
 
@@ -487,10 +540,12 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       }
 
       // Record winner
-      await Winner.create({
-        gameId,
-        playerId: player._id.toString(),
-        category,
+      await prisma.winner.create({
+        data: {
+          gameId,
+          playerId: player.id,
+          category,
+        },
       });
 
       // Record won category
@@ -508,10 +563,13 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       }
 
       // Get user info for broadcast
-      // Only query User model if userId is a valid ObjectId (not mobile app user)
       let user = null;
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        user = await User.findById(userId);
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: userId },
+        });
+      } catch (err) {
+        // User might not exist (mobile app users), use default
       }
 
       // Broadcast to winner
@@ -523,12 +581,12 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
 
       // Broadcast to all players and organizer in the game room (except the winner)
       socket.to(`game:${gameId}`).emit('game:winner', {
-        playerId: player._id.toString(),
+        playerId: player.id,
         userName: user?.name || player.userName,
         category,
       });
 
-      logger.info({ gameId, userId, playerId: player._id.toString(), category }, 'Win claimed successfully');
+      logger.info({ gameId, userId, playerId: player.id, category }, 'Win claimed successfully');
 
       // Check if game complete (all categories won)
       const updatedState = await gameService.getGameState(gameId);
@@ -559,7 +617,13 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
     const userId = socket.data.userId as string;
 
     // Verify player owns this ticket
-    const player = await Player.findOne({ _id: playerId, gameId, userId });
+    const player = await prisma.player.findFirst({
+      where: {
+        id: playerId,
+        gameId,
+        userId,
+      },
+    });
 
     if (!player) {
       socket.emit('error', { code: 'INVALID_PLAYER', message: 'Invalid player or ticket' });
@@ -567,7 +631,9 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
     }
 
     // Get game to check if number was called
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
@@ -575,7 +641,8 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
     }
 
     // Verify number was called
-    if (!game.calledNumbers.includes(number)) {
+    const calledNumbers = game.calledNumbers as number[];
+    if (!calledNumbers.includes(number)) {
       socket.emit('error', { code: 'NUMBER_NOT_CALLED', message: 'Number not called yet' });
       return;
     }

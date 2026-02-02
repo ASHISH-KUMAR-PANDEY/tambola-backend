@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import sharp from 'sharp';
-import { PromotionalBanner } from '../../models/index.js';
+import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured } from '../../services/s3.service.js';
@@ -76,7 +76,7 @@ export async function uploadBanner(
     }
 
     // Delete old banner if exists
-    const existingBanner = await PromotionalBanner.findOne();
+    const existingBanner = await prisma.promotionalBanner.findFirst();
     if (existingBanner) {
       try {
         if (existingBanner.s3Key) {
@@ -89,21 +89,25 @@ export async function uploadBanner(
       } catch (error) {
         logger.error({ error }, 'Failed to delete old banner');
       }
-      await PromotionalBanner.deleteOne({ _id: existingBanner._id });
+      await prisma.promotionalBanner.delete({
+        where: { id: existingBanner.id },
+      });
     }
 
     // Save new banner to database
-    const banner = await PromotionalBanner.create({
-      imageUrl,
-      s3Key: s3Key || undefined,
-      uploadedBy: authReq.user.userId,
-      width,
-      height,
-      fileSize: buffer.length,
+    const banner = await prisma.promotionalBanner.create({
+      data: {
+        imageUrl,
+        s3Key: s3Key || null,
+        uploadedBy: authReq.user.userId,
+        width,
+        height,
+        fileSize: buffer.length,
+      },
     });
 
     await reply.status(201).send({
-      id: banner._id.toString(),
+      id: banner.id,
       imageUrl: banner.imageUrl,
       width: banner.width,
       height: banner.height,
@@ -125,7 +129,9 @@ export async function getCurrentBanner(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const banner = await PromotionalBanner.findOne().sort({ createdAt: -1 }).lean();
+    const banner = await prisma.promotionalBanner.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (!banner) {
       await reply.send({ banner: null });
@@ -134,7 +140,7 @@ export async function getCurrentBanner(
 
     await reply.send({
       banner: {
-        id: banner._id.toString(),
+        id: banner.id,
         imageUrl: banner.imageUrl,
         width: banner.width,
         height: banner.height,
@@ -151,7 +157,7 @@ export async function deleteBanner(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const banner = await PromotionalBanner.findOne();
+    const banner = await prisma.promotionalBanner.findFirst();
 
     if (!banner) {
       throw new AppError('BANNER_NOT_FOUND', 'No promotional banner found', 404);
@@ -171,7 +177,9 @@ export async function deleteBanner(
     }
 
     // Delete from database
-    await PromotionalBanner.deleteOne({ _id: banner._id });
+    await prisma.promotionalBanner.delete({
+      where: { id: banner.id },
+    });
 
     await reply.status(204).send();
   } catch (error) {

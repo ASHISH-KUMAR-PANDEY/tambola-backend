@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcrypt';
-import { User } from '../../models/index.js';
+import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import { loginSchema, signupSchema, type LoginInput, type SignupInput } from './auth.schema.js';
 
@@ -15,7 +15,9 @@ export async function signup(
     const body = signupSchema.parse(request.body);
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email: body.email });
+    const existingUser = await prisma.user.findUnique({
+      where: { email: body.email },
+    });
 
     if (existingUser) {
       throw new AppError('USER_EXISTS', 'User with this email already exists', 409);
@@ -25,23 +27,25 @@ export async function signup(
     const hashedPassword = await bcrypt.hash(body.password, SALT_ROUNDS);
 
     // Create user
-    const user = await User.create({
-      email: body.email,
-      password: hashedPassword,
-      name: body.name,
-      role: body.role || 'PLAYER',
+    const user = await prisma.user.create({
+      data: {
+        email: body.email,
+        password: hashedPassword,
+        name: body.name,
+        role: body.role || 'PLAYER',
+      },
     });
 
     // Generate JWT token
     const token = request.server.jwt.sign({
-      userId: user._id.toString(),
+      userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     await reply.status(201).send({
       user: {
-        id: user._id.toString(),
+        id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
@@ -68,7 +72,9 @@ export async function login(
     const body = loginSchema.parse(request.body);
 
     // Find user
-    const user = await User.findOne({ email: body.email });
+    const user = await prisma.user.findUnique({
+      where: { email: body.email },
+    });
 
     if (!user) {
       throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
@@ -83,14 +89,14 @@ export async function login(
 
     // Generate JWT token
     const token = request.server.jwt.sign({
-      userId: user._id.toString(),
+      userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     await reply.send({
       user: {
-        id: user._id.toString(),
+        id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
@@ -114,7 +120,10 @@ export async function me(
   try {
     const decoded = (await request.jwtVerify()) as any;
 
-    const user = await User.findById(decoded.userId).select('email name role createdAt');
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
+    });
 
     if (!user) {
       throw new AppError('USER_NOT_FOUND', 'User not found', 404);
@@ -122,7 +131,7 @@ export async function me(
 
     await reply.send({
       user: {
-        id: user._id.toString(),
+        id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,
@@ -150,7 +159,10 @@ export async function validateUser(
     }
 
     // Find user by ID
-    const user = await User.findById(userId).select('email name role createdAt');
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
+    });
 
     if (!user) {
       throw new AppError('USER_NOT_FOUND', 'User not found', 404);
@@ -158,14 +170,14 @@ export async function validateUser(
 
     // Generate JWT token
     const token = request.server.jwt.sign({
-      userId: user._id.toString(),
+      userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     await reply.send({
       user: {
-        id: user._id.toString(),
+        id: user.id,
         email: user.email,
         name: user.name,
         role: user.role,

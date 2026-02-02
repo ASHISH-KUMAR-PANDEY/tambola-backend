@@ -1,37 +1,40 @@
-import mongoose from 'mongoose';
+import { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/logger.js';
 
-const MONGODB_URL = process.env.MONGODB_URL || 'mongodb://tambola:tambola_dev_password@localhost:27017/tambola_db?authSource=admin';
+// Create Prisma client instance
+export const prisma = new PrismaClient({
+  log: [
+    { level: 'warn', emit: 'event' },
+    { level: 'error', emit: 'event' },
+  ],
+});
 
-// Connect to MongoDB
+// Setup event handlers
+prisma.$on('warn', (e) => {
+  logger.warn({ message: e.message }, 'Prisma warning');
+});
+
+prisma.$on('error', (e) => {
+  logger.error({ message: e.message }, 'Prisma error');
+});
+
+// Connect to PostgreSQL
 export async function connectDatabase(): Promise<void> {
   try {
-    await mongoose.connect(MONGODB_URL);
-    logger.info('MongoDB connected');
+    await prisma.$connect();
+    logger.info('PostgreSQL connected via Prisma');
   } catch (error) {
-    logger.error({ error }, 'MongoDB connection failed');
+    logger.error({ error }, 'PostgreSQL connection failed');
     throw error;
   }
 }
 
-// Disconnect from MongoDB
+// Disconnect from PostgreSQL
 export async function disconnectDatabase(): Promise<void> {
   try {
-    await mongoose.disconnect();
-    logger.info('MongoDB disconnected');
+    await prisma.$disconnect();
+    logger.info('PostgreSQL disconnected');
   } catch (error) {
-    logger.error({ error }, 'MongoDB disconnection failed');
+    logger.error({ error }, 'PostgreSQL disconnection failed');
   }
 }
-
-// Connection event handlers
-mongoose.connection.on('error', (err) => {
-  logger.error({ error: err }, 'MongoDB error');
-});
-
-mongoose.connection.on('disconnected', () => {
-  logger.warn('MongoDB disconnected');
-});
-
-// Export mongoose for compatibility
-export { mongoose };

@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { Game, Player, Winner, GameStatus } from '../../models/index.js';
+import { prisma, GameStatus } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
@@ -19,14 +19,16 @@ export async function createGame(
     const authReq = request as AuthenticatedRequest;
     const body = createGameSchema.parse(request.body);
 
-    const game = await Game.create({
-      scheduledTime: new Date(body.scheduledTime),
-      createdBy: authReq.user.userId,
-      prizes: body.prizes,
+    const game = await prisma.game.create({
+      data: {
+        scheduledTime: new Date(body.scheduledTime),
+        createdBy: authReq.user.userId,
+        prizes: body.prizes,
+      },
     });
 
     await reply.status(201).send({
-      id: game._id.toString(),
+      id: game.id,
       scheduledTime: game.scheduledTime,
       status: game.status,
       createdBy: game.createdBy,
@@ -49,19 +51,32 @@ export async function listGames(
   try {
     const { status } = request.query as { status?: string };
 
-    const filter = status ? { status: status as any } : {};
-    const games = await Game.find(filter)
-      .select('scheduledTime startedAt endedAt status prizes calledNumbers currentNumber createdBy')
-      .sort({ scheduledTime: -1 })
-      .limit(50)
-      .lean();
+    const where = status ? { status: status as any } : {};
+    const games = await prisma.game.findMany({
+      where,
+      select: {
+        id: true,
+        scheduledTime: true,
+        startedAt: true,
+        endedAt: true,
+        status: true,
+        prizes: true,
+        calledNumbers: true,
+        currentNumber: true,
+        createdBy: true,
+      },
+      orderBy: { scheduledTime: 'desc' },
+      take: 50,
+    });
 
     // Get player counts for each game
     const gamesWithCounts = await Promise.all(
       games.map(async (game) => {
-        const playerCount = await Player.countDocuments({ gameId: game._id.toString() });
+        const playerCount = await prisma.player.count({
+          where: { gameId: game.id },
+        });
         return {
-          id: game._id.toString(),
+          id: game.id,
           scheduledTime: game.scheduledTime,
           startedAt: game.startedAt,
           endedAt: game.endedAt,
@@ -88,21 +103,31 @@ export async function getGame(
   try {
     const { gameId } = request.params as { gameId: string };
 
-    const game = await Game.findById(gameId).lean();
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
     }
 
     // Get counts
-    const playerCount = await Player.countDocuments({ gameId });
-    const winnerCount = await Winner.countDocuments({ gameId });
+    const playerCount = await prisma.player.count({
+      where: { gameId },
+    });
+    const winnerCount = await prisma.winner.count({
+      where: { gameId },
+    });
 
     // Get winners with player details
-    const winners = await Winner.find({ gameId }).lean();
+    const winners = await prisma.winner.findMany({
+      where: { gameId },
+    });
     const winnersWithDetails = await Promise.all(
       winners.map(async (winner) => {
-        const player = await Player.findById(winner.playerId).lean();
+        const player = await prisma.player.findUnique({
+          where: { id: winner.playerId },
+        });
         return {
           playerId: winner.playerId,
           category: winner.category,
@@ -112,7 +137,7 @@ export async function getGame(
     );
 
     await reply.send({
-      id: game._id.toString(),
+      id: game.id,
       scheduledTime: game.scheduledTime,
       startedAt: game.startedAt,
       endedAt: game.endedAt,
@@ -146,7 +171,9 @@ export async function updateGameStatus(
     const body = updateGameStatusSchema.parse(request.body);
 
     // Verify game exists and user is creator
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
@@ -167,9 +194,18 @@ export async function updateGameStatus(
       updateData.endedAt = new Date();
     }
 
-    const updatedGame = await Game.findByIdAndUpdate(gameId, updateData, { new: true })
-      .select('scheduledTime startedAt endedAt status prizes')
-      .lean();
+    const updatedGame = await prisma.game.update({
+      where: { id: gameId },
+      data: updateData,
+      select: {
+        id: true,
+        scheduledTime: true,
+        startedAt: true,
+        endedAt: true,
+        status: true,
+        prizes: true,
+      },
+    });
 
     // If game is being completed, notify all players in the room
     if (body.status === 'COMPLETED') {
@@ -182,12 +218,12 @@ export async function updateGameStatus(
     }
 
     await reply.send({
-      id: updatedGame?._id.toString(),
-      scheduledTime: updatedGame?.scheduledTime,
-      startedAt: updatedGame?.startedAt,
-      endedAt: updatedGame?.endedAt,
-      status: updatedGame?.status,
-      prizes: updatedGame?.prizes,
+      id: updatedGame.id,
+      scheduledTime: updatedGame.scheduledTime,
+      startedAt: updatedGame.startedAt,
+      endedAt: updatedGame.endedAt,
+      status: updatedGame.status,
+      prizes: updatedGame.prizes,
     });
   } catch (error) {
     if (error instanceof AppError) {
@@ -230,7 +266,10 @@ export async function getMyActiveGames(
     }
 
     // Find all games the player has joined that are still active or in lobby
-    const playerRecords = await Player.find({ userId }).select('gameId ticket').lean();
+    const playerRecords = await prisma.player.findMany({
+      where: { userId },
+      select: { id: true, gameId: true, ticket: true },
+    });
 
     if (playerRecords.length === 0) {
       await reply.send({ games: [] });
@@ -240,29 +279,38 @@ export async function getMyActiveGames(
     const gameIds = playerRecords.map((p) => p.gameId);
 
     // Get games that are still LOBBY or ACTIVE
-    const games = await Game.find({
-      _id: { $in: gameIds },
-      status: { $in: [GameStatus.LOBBY, GameStatus.ACTIVE] },
-    })
-      .select('scheduledTime startedAt status prizes calledNumbers currentNumber')
-      .sort({ scheduledTime: -1 })
-      .lean();
+    const games = await prisma.game.findMany({
+      where: {
+        id: { in: gameIds },
+        status: { in: [GameStatus.LOBBY, GameStatus.ACTIVE] },
+      },
+      select: {
+        id: true,
+        scheduledTime: true,
+        startedAt: true,
+        status: true,
+        prizes: true,
+        calledNumbers: true,
+        currentNumber: true,
+      },
+      orderBy: { scheduledTime: 'desc' },
+    });
 
     // Attach player's ticket and marked numbers to each game
     const gamesWithTickets = await Promise.all(
       games.map(async (game) => {
-        const playerRecord = playerRecords.find((p) => p.gameId === game._id.toString());
+        const playerRecord = playerRecords.find((p) => p.gameId === game.id);
 
         // Fetch marked numbers from Redis
         let markedNumbers: number[] = [];
         if (playerRecord) {
-          const key = `game:${game._id.toString()}:player:${playerRecord._id.toString()}:ticket`;
+          const key = `game:${game.id}:player:${playerRecord.id}:ticket`;
           const markedNumbersStr = await redis.hget(key, 'markedNumbers');
           markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
         }
 
         return {
-          id: game._id.toString(),
+          id: game.id,
           scheduledTime: game.scheduledTime,
           startedAt: game.startedAt,
           status: game.status,
@@ -270,7 +318,7 @@ export async function getMyActiveGames(
           calledNumbers: game.calledNumbers || [],
           currentNumber: game.currentNumber,
           ticket: playerRecord?.ticket,
-          playerId: playerRecord?._id?.toString(),
+          playerId: playerRecord?.id,
           markedNumbers,
         };
       })
@@ -291,7 +339,9 @@ export async function deleteGame(
     const { gameId } = request.params as { gameId: string };
 
     // Verify game exists and user is creator
-    const game = await Game.findById(gameId);
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
 
     if (!game) {
       throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
@@ -323,9 +373,15 @@ export async function deleteGame(
     }
 
     // Delete related documents
-    await Player.deleteMany({ gameId });
-    await Winner.deleteMany({ gameId });
-    await Game.findByIdAndDelete(gameId);
+    await prisma.player.deleteMany({
+      where: { gameId },
+    });
+    await prisma.winner.deleteMany({
+      where: { gameId },
+    });
+    await prisma.game.delete({
+      where: { id: gameId },
+    });
 
     await reply.status(204).send();
   } catch (error) {

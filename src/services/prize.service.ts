@@ -1,4 +1,4 @@
-import { PrizeQueue, QueueStatus, WinCategory } from '../models/index.js';
+import { prisma, QueueStatus, WinCategory } from '../models/index.js';
 import { logger } from '../utils/logger.js';
 
 const MAX_RETRY_ATTEMPTS = 3;
@@ -23,45 +23,51 @@ export async function enqueuePrize(
     // Generate idempotency key for external API
     const idempotencyKey = `${input.gameId}-${input.userId}-${input.category}-${Date.now()}`;
 
-    const prizeQueue = await PrizeQueue.create({
-      userId: input.userId,
-      gameId: input.gameId,
-      category: input.category,
-      prizeValue: input.prizeValue,
-      status: QueueStatus.PENDING,
-      idempotencyKey,
+    const prizeQueue = await prisma.prizeQueue.create({
+      data: {
+        userId: input.userId,
+        gameId: input.gameId,
+        category: input.category,
+        prizeValue: input.prizeValue,
+        status: QueueStatus.PENDING,
+        idempotencyKey,
+      },
     });
 
     logger.info(
-      { prizeQueueId: prizeQueue._id.toString(), userId: input.userId, category: input.category },
+      { prizeQueueId: prizeQueue.id, userId: input.userId, category: input.category },
       'Prize enqueued'
     );
 
     // Process immediately (async)
-    processPrizeQueue(prizeQueue._id.toString()).catch((error) => {
+    processPrizeQueue(prizeQueue.id).catch((error) => {
       logger.error(
-        { error, prizeQueueId: prizeQueue._id.toString() },
+        { error, prizeQueueId: prizeQueue.id },
         'Failed to process prize queue'
       );
     });
 
-    return prizeQueue._id.toString();
+    return prizeQueue.id;
   } catch (error: any) {
     // Handle duplicate prize (idempotent behavior)
-    if (error.code === 11000) {
+    if (error.code === 'P2002') {
       logger.warn(
         { userId: input.userId, gameId: input.gameId, category: input.category },
         'Prize already enqueued (duplicate prevented)'
       );
 
       // Return existing prize queue ID
-      const existing = await PrizeQueue.findOne({
-        userId: input.userId,
-        gameId: input.gameId,
-        category: input.category,
+      const existing = await prisma.prizeQueue.findUnique({
+        where: {
+          userId_gameId_category: {
+            userId: input.userId,
+            gameId: input.gameId,
+            category: input.category,
+          },
+        },
       });
 
-      return existing?._id.toString() || '';
+      return existing?.id || '';
     }
 
     logger.error({ error, input }, 'Failed to enqueue prize');
@@ -73,26 +79,34 @@ export async function enqueuePrize(
  * Processes a prize queue item with retry logic
  */
 async function processPrizeQueue(prizeQueueId: string): Promise<void> {
-  const prizeQueue = await PrizeQueue.findById(prizeQueueId);
+  const prizeQueue = await prisma.prizeQueue.findUnique({
+    where: { id: prizeQueueId },
+  });
 
   if (!prizeQueue || prizeQueue.status !== QueueStatus.PENDING) {
     return;
   }
 
   // Mark as processing
-  await PrizeQueue.findByIdAndUpdate(prizeQueueId, { status: QueueStatus.PROCESSING });
+  await prisma.prizeQueue.update({
+    where: { id: prizeQueueId },
+    data: { status: QueueStatus.PROCESSING },
+  });
 
   try {
     // Call external prize distribution API with idempotency key
     await distributePrizeExternal(
       prizeQueue.userId,
-      prizeQueue.category,
+      prizeQueue.category as WinCategory,
       prizeQueue.prizeValue,
       prizeQueue.idempotencyKey || undefined
     );
 
     // Mark as completed
-    await PrizeQueue.findByIdAndUpdate(prizeQueueId, { status: QueueStatus.COMPLETED });
+    await prisma.prizeQueue.update({
+      where: { id: prizeQueueId },
+      data: { status: QueueStatus.COMPLETED },
+    });
 
     logger.info({ prizeQueueId }, 'Prize distributed successfully');
   } catch (error) {
@@ -103,11 +117,14 @@ async function processPrizeQueue(prizeQueueId: string): Promise<void> {
 
     if (attempts >= MAX_RETRY_ATTEMPTS) {
       // Move to dead letter queue
-      await PrizeQueue.findByIdAndUpdate(prizeQueueId, {
-        status: QueueStatus.DEAD_LETTER,
-        attempts,
-        lastAttempt: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
+      await prisma.prizeQueue.update({
+        where: { id: prizeQueueId },
+        data: {
+          status: QueueStatus.DEAD_LETTER,
+          attempts,
+          lastAttempt: new Date(),
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
 
       logger.error({ prizeQueueId }, 'Prize moved to dead letter queue');
@@ -115,11 +132,14 @@ async function processPrizeQueue(prizeQueueId: string): Promise<void> {
       // TODO: Send alert to monitoring system (e.g., Slack webhook)
     } else {
       // Schedule retry
-      await PrizeQueue.findByIdAndUpdate(prizeQueueId, {
-        status: QueueStatus.PENDING,
-        attempts,
-        lastAttempt: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
+      await prisma.prizeQueue.update({
+        where: { id: prizeQueueId },
+        data: {
+          status: QueueStatus.PENDING,
+          attempts,
+          lastAttempt: new Date(),
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
 
       const delay = RETRY_DELAYS[attempts - 1] || 30000;
@@ -171,18 +191,19 @@ async function distributePrizeExternal(
  * Gets pending prize queue items for manual intervention
  */
 export async function getPendingPrizes(gameId?: string): Promise<any[]> {
-  const filter: any = {
-    status: { $in: [QueueStatus.PENDING, QueueStatus.PROCESSING, QueueStatus.DEAD_LETTER] },
+  const where: any = {
+    status: { in: [QueueStatus.PENDING, QueueStatus.PROCESSING, QueueStatus.DEAD_LETTER] },
   };
 
   if (gameId) {
-    filter.gameId = gameId;
+    where.gameId = gameId;
   }
 
-  const prizes = await PrizeQueue.find(filter)
-    .sort({ createdAt: -1 })
-    .limit(100)
-    .lean();
+  const prizes = await prisma.prizeQueue.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
 
   return prizes;
 }
@@ -191,16 +212,21 @@ export async function getPendingPrizes(gameId?: string): Promise<any[]> {
  * Manually retries a failed prize distribution
  */
 export async function retryPrize(prizeQueueId: string): Promise<void> {
-  const prizeQueue = await PrizeQueue.findById(prizeQueueId);
+  const prizeQueue = await prisma.prizeQueue.findUnique({
+    where: { id: prizeQueueId },
+  });
 
   if (!prizeQueue || prizeQueue.status === QueueStatus.COMPLETED) {
     throw new Error('Prize queue not found or already completed');
   }
 
-  await PrizeQueue.findByIdAndUpdate(prizeQueueId, {
-    status: QueueStatus.PENDING,
-    attempts: 0,
-    error: null,
+  await prisma.prizeQueue.update({
+    where: { id: prizeQueueId },
+    data: {
+      status: QueueStatus.PENDING,
+      attempts: 0,
+      error: null,
+    },
   });
 
   await processPrizeQueue(prizeQueueId);

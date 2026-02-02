@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { YouTubeLiveStream } from '../../models/index.js';
+import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import { logger } from '../../utils/logger.js';
@@ -55,22 +55,26 @@ export async function setYouTubeLiveStream(
     }
 
     // Delete old live stream if exists (only one active live stream at a time)
-    const existingStream = await YouTubeLiveStream.findOne();
+    const existingStream = await prisma.youTubeLiveStream.findFirst();
     if (existingStream) {
-      await YouTubeLiveStream.deleteOne({ _id: existingStream._id });
+      await prisma.youTubeLiveStream.delete({
+        where: { id: existingStream.id },
+      });
     }
 
     // Save new live stream to database
-    const stream = await YouTubeLiveStream.create({
-      videoUrl,
-      embedId,
-      uploadedBy: authReq.user.userId,
+    const stream = await prisma.youTubeLiveStream.create({
+      data: {
+        videoUrl,
+        embedId,
+        uploadedBy: authReq.user.userId,
+      },
     });
 
     logger.info({ embedId, videoUrl }, 'YouTube live stream set');
 
     await reply.status(201).send({
-      id: stream._id.toString(),
+      id: stream.id,
       videoUrl: stream.videoUrl,
       embedId: stream.embedId,
       createdAt: stream.createdAt,
@@ -90,7 +94,9 @@ export async function getCurrentYouTubeLiveStream(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const stream = await YouTubeLiveStream.findOne().sort({ createdAt: -1 }).lean();
+    const stream = await prisma.youTubeLiveStream.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (!stream) {
       await reply.send({ stream: null });
@@ -99,7 +105,7 @@ export async function getCurrentYouTubeLiveStream(
 
     await reply.send({
       stream: {
-        id: stream._id.toString(),
+        id: stream.id,
         videoUrl: stream.videoUrl,
         embedId: stream.embedId,
         createdAt: stream.createdAt,
@@ -116,14 +122,16 @@ export async function deleteYouTubeLiveStream(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const stream = await YouTubeLiveStream.findOne();
+    const stream = await prisma.youTubeLiveStream.findFirst();
 
     if (!stream) {
       throw new AppError('LIVESTREAM_NOT_FOUND', 'No YouTube live stream found', 404);
     }
 
     // Delete from database
-    await YouTubeLiveStream.deleteOne({ _id: stream._id });
+    await prisma.youTubeLiveStream.delete({
+      where: { id: stream.id },
+    });
 
     logger.info({ embedId: stream.embedId }, 'YouTube live stream deleted');
 

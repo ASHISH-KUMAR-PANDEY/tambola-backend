@@ -1,6 +1,6 @@
 import { redis } from '../database/redis.js';
 import { logger } from '../utils/logger.js';
-import { Game, GameStatus, Player, Winner, WinCategory } from '../models/index.js';
+import { prisma, GameStatus, WinCategory } from '../models/index.js';
 
 export interface GameState {
   gameId: string;
@@ -48,25 +48,34 @@ export async function getGameState(gameId: string): Promise<GameState | null> {
     };
   }
 
-  // Fallback to MongoDB
-  const game = await Game.findById(gameId).select('status calledNumbers currentNumber');
+  // Fallback to PostgreSQL
+  const game = await prisma.game.findUnique({
+    where: { id: gameId },
+    select: { id: true, status: true, calledNumbers: true, currentNumber: true },
+  });
 
   if (!game) {
     return null;
   }
 
   // Get player count
-  const playerCount = await Player.countDocuments({ gameId });
+  const playerCount = await prisma.player.count({
+    where: { gameId },
+  });
 
   // Get won categories
-  const winners = await Winner.find({ gameId }).distinct('category');
+  const winners = await prisma.winner.findMany({
+    where: { gameId },
+    select: { category: true },
+    distinct: ['category'],
+  });
 
   return {
-    gameId: game._id.toString(),
+    gameId: game.id,
     status: game.status,
-    calledNumbers: game.calledNumbers,
+    calledNumbers: game.calledNumbers as number[],
     currentNumber: game.currentNumber ?? null,
-    wonCategories: new Set(winners as WinCategory[]),
+    wonCategories: new Set(winners.map((w) => w.category as WinCategory)),
     playerCount,
   };
 }
@@ -98,10 +107,13 @@ export async function callNumber(
     currentNumber: number.toString(),
   });
 
-  // Also update MongoDB
-  await Game.findByIdAndUpdate(gameId, {
-    calledNumbers,
-    currentNumber: number,
+  // Also update PostgreSQL
+  await prisma.game.update({
+    where: { id: gameId },
+    data: {
+      calledNumbers,
+      currentNumber: number,
+    },
   });
 
   logger.info({ gameId, number, total: calledNumbers.length }, 'Number called');
@@ -160,7 +172,10 @@ export async function updateGameStatus(
     updateData.endedAt = new Date();
   }
 
-  await Game.findByIdAndUpdate(gameId, updateData);
+  await prisma.game.update({
+    where: { id: gameId },
+    data: updateData,
+  });
 
   logger.info({ gameId, status }, 'Game status updated');
 
@@ -181,12 +196,15 @@ async function syncGameStateToDatabase(gameId: string): Promise<void> {
     return;
   }
 
-  await Game.findByIdAndUpdate(gameId, {
-    calledNumbers: gameState.calledNumbers,
-    currentNumber: gameState.currentNumber,
+  await prisma.game.update({
+    where: { id: gameId },
+    data: {
+      calledNumbers: gameState.calledNumbers,
+      currentNumber: gameState.currentNumber,
+    },
   });
 
-  logger.info({ gameId }, 'Game state synced to MongoDB');
+  logger.info({ gameId }, 'Game state synced to PostgreSQL');
 
   // Clean up Redis cache using SCAN (non-blocking)
   const pattern = `game:${gameId}:*`;
