@@ -5,6 +5,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   // Public routes
   fastify.post('/signup', authController.signup);
   fastify.post('/login', authController.login);
+  fastify.post('/validate-user', authController.validateUser);
 
   // Protected route
   fastify.get('/me', authController.me);

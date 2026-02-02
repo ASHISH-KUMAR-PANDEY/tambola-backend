@@ -3,13 +3,13 @@ import { authMiddleware } from '../../middleware/auth.middleware.js';
 import * as gamesController from './games.controller.js';
 
 export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
-  // All game routes require authentication
-  fastify.addHook('onRequest', authMiddleware);
-
-  fastify.post('/', gamesController.createGame);
+  // Public routes (no auth required)
   fastify.get('/', gamesController.listGames);
   fastify.get('/my-active', gamesController.getMyActiveGames);
   fastify.get('/:gameId', gamesController.getGame);
-  fastify.patch('/:gameId/status', gamesController.updateGameStatus);
-  fastify.delete('/:gameId', gamesController.deleteGame);
+
+  // Protected routes (require auth - organizer only)
+  fastify.post('/', { onRequest: authMiddleware }, gamesController.createGame);
+  fastify.patch('/:gameId/status', { onRequest: authMiddleware }, gamesController.updateGameStatus);
+  fastify.delete('/:gameId', { onRequest: authMiddleware }, gamesController.deleteGame);
 }

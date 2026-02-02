@@ -137,3 +137,47 @@ export async function me(
     throw new AppError('UNAUTHORIZED', 'Invalid authentication token', 401);
   }
 }
+
+export async function validateUser(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { userId } = request.body as { userId: string };
+
+    if (!userId) {
+      throw new AppError('INVALID_REQUEST', 'userId is required', 400);
+    }
+
+    // Find user by ID
+    const user = await User.findById(userId).select('email name role createdAt');
+
+    if (!user) {
+      throw new AppError('USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    // Generate JWT token
+    const token = request.server.jwt.sign({
+      userId: user._id.toString(),
+      email: user.email,
+      role: user.role,
+    });
+
+    await reply.send({
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+      token,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError('VALIDATION_FAILED', 'Failed to validate user', 500);
+  }
+}

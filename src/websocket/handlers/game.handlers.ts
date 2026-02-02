@@ -136,13 +136,24 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Generate ticket (3x9 grid)
     const ticketGrid = generateTicket();
 
+    // Get userName - try to fetch from User collection, fallback to userId
+    let userName = `Player ${userId.slice(-4)}`;
+    try {
+      const user = await User.findById(userId).select('name email').lean();
+      if (user) {
+        userName = user.name || user.email;
+      }
+    } catch (err) {
+      // User might not exist (mobile app users), use default
+    }
+
     let player;
     try {
       // Create player record (store full grid as JSON)
       player = await Player.create({
         gameId,
         userId,
-        userName: socket.data.email || 'Player',
+        userName,
         ticket: ticketGrid,  // Store as JSON grid
       });
     } catch (error: any) {
