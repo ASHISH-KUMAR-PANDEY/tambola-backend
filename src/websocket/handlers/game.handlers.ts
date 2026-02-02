@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import { Game, Player, Winner, User, GameStatus } from '../../models/index.js';
 import { redis } from '../../database/redis.js';
 import { logger } from '../../utils/logger.js';
@@ -107,7 +108,17 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
 
       // Get all winners
-      const winners = await Winner.find({ gameId }).select('playerId category').lean();
+      const winnersData = await Winner.find({ gameId }).select('playerId category').lean();
+
+      // Map winners with userName from players
+      const winners = winnersData.map((w) => {
+        const player = allPlayers.find((p) => p._id.toString() === w.playerId);
+        return {
+          playerId: w.playerId,
+          category: w.category,
+          userName: player?.userName,
+        };
+      });
 
       socket.emit('game:joined', {
         gameId,
@@ -115,19 +126,32 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         ticket: existingPlayer.ticket,
       });
 
+      // Fetch markedNumbers from Redis for the rejoining player
+      const ticketKey = `game:${gameId}:player:${existingPlayer._id.toString()}:ticket`;
+      const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
+      const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
+
       // Send current game state for rejoining player
-      socket.emit('game:stateSync', {
+      const stateSyncData = {
         calledNumbers: game.calledNumbers || [],
         currentNumber: game.currentNumber,
         players: allPlayers.map((p) => ({
           playerId: p._id.toString(),
           userName: p.userName,
         })),
-        winners: winners.map((w) => ({
-          playerId: w.playerId,
-          category: w.category,
-        })),
+        winners: winners,
+        markedNumbers: markedNumbers, // Include player's marked numbers
+      };
+
+      console.log('[StateSync] Sending to rejoining player:', {
+        gameId,
+        playerId: existingPlayer._id.toString(),
+        winnersCount: winners.length,
+        winners: winners,
+        markedNumbersCount: markedNumbers.length,
       });
+
+      socket.emit('game:stateSync', stateSyncData);
 
       logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined game');
       return;
@@ -139,9 +163,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Get userName - try to fetch from User collection, fallback to userId
     let userName = `Player ${userId.slice(-4)}`;
     try {
-      const user = await User.findById(userId).select('name email').lean();
-      if (user) {
-        userName = user.name || user.email;
+      // Only query User model if userId is a valid ObjectId (not mobile app user)
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        const user = await User.findById(userId).select('name email').lean();
+        if (user) {
+          userName = user.name || user.email;
+        }
       }
     } catch (err) {
       // User might not exist (mobile app users), use default
@@ -167,13 +194,28 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
           // Get all players and winners for state sync
           const allPlayers = await Player.find({ gameId }).select('_id userName').lean();
-          const winners = await Winner.find({ gameId }).select('playerId category').lean();
+          const winnersData = await Winner.find({ gameId }).select('playerId category').lean();
+
+          // Map winners with userName from players
+          const winners = winnersData.map((w) => {
+            const player = allPlayers.find((p) => p._id.toString() === w.playerId);
+            return {
+              playerId: w.playerId,
+              category: w.category,
+              userName: player?.userName,
+            };
+          });
 
           socket.emit('game:joined', {
             gameId,
             playerId: existingPlayer._id.toString(),
             ticket: existingPlayer.ticket,
           });
+
+          // Fetch markedNumbers from Redis for the rejoining player
+          const ticketKey = `game:${gameId}:player:${existingPlayer._id.toString()}:ticket`;
+          const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
+          const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
           socket.emit('game:stateSync', {
             calledNumbers: game.calledNumbers || [],
@@ -182,10 +224,8 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
               playerId: p._id.toString(),
               userName: p.userName,
             })),
-            winners: winners.map((w) => ({
-              playerId: w.playerId,
-              category: w.category,
-            })),
+            winners: winners,
+            markedNumbers: markedNumbers, // Include player's marked numbers
           });
 
           logger.info({ gameId, userId, playerId: existingPlayer._id.toString() }, 'Player rejoined after race');
@@ -468,7 +508,11 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       }
 
       // Get user info for broadcast
-      const user = await User.findById(userId);
+      // Only query User model if userId is a valid ObjectId (not mobile app user)
+      let user = null;
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        user = await User.findById(userId);
+      }
 
       // Broadcast to winner
       socket.emit('game:winClaimed', {
