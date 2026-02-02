@@ -57,11 +57,13 @@ import { authRoutes } from './api/auth/auth.routes.js';
 import { gamesRoutes } from './api/games/games.routes.js';
 import { promotionalBannerRoutes } from './api/promotional-banner/promotional-banner.routes.js';
 import { youTubeEmbedRoutes } from './api/youtube-embed/youtube-embed.routes.js';
+import { youtubeLivestreamRoutes } from './api/youtube-livestream/youtube-livestream.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
 await fastify.register(promotionalBannerRoutes, { prefix: '/api/v1/promotional-banner' });
 await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
+await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-livestream' });
 
 // Socket.IO setup
 const io = new SocketIOServer(fastify.server, {
@@ -80,20 +82,19 @@ setIO(io);
 // Socket.IO middleware for authentication
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token || socket.handshake.query.token;
+    const userId = socket.handshake.auth.userId || socket.handshake.query.userId;
 
-    if (!token) {
-      return next(new Error('Authentication token required'));
+    if (!userId) {
+      return next(new Error('userId required'));
     }
 
-    const decoded = fastify.jwt.verify(token as string) as any;
-    socket.data.userId = decoded.userId;
-    socket.data.email = decoded.email;
+    // Store userId in socket data
+    socket.data.userId = userId;
 
     next();
   } catch (error) {
     logger.error({ error }, 'Socket authentication failed');
-    next(new Error('Invalid authentication token'));
+    next(new Error('Invalid userId'));
   }
 });
 

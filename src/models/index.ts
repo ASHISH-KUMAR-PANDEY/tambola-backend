@@ -5,3 +5,4 @@ export * from './Winner.js';
 export * from './PrizeQueue.js';
 export * from './PromotionalBanner.js';
 export * from './YouTubeEmbed.js';
+export * from './YouTubeLiveStream.js';
