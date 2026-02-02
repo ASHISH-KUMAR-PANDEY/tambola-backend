@@ -1,4 +1,5 @@
-FROM node:20-alpine AS base
+# Build stage
+FROM node:20-alpine AS builder
 
 # Install dependencies for Prisma
 RUN apk add --no-cache libc6-compat openssl
@@ -9,8 +10,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install ALL dependencies (including devDependencies for build)
+RUN npm ci && npm cache clean --force
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -20,6 +21,29 @@ COPY . .
 
 # Build TypeScript
 RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Install dependencies for Prisma
+RUN apk add --no-cache libc6-compat openssl
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install ONLY production dependencies + Prisma CLI for migrations
+RUN npm ci --only=production && \
+    npm install prisma@5.22.0 && \
+    npm cache clean --force
+
+# Generate Prisma Client
+RUN npx prisma generate
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
 
 # Expose port
 EXPOSE 3000
