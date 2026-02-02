@@ -203,8 +203,31 @@ export async function getMyActiveGames(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const authReq = request as AuthenticatedRequest;
-    const userId = authReq.user.userId;
+    const query = request.query as { userId?: string };
+    let userId: string | undefined;
+
+    // Try to get userId from JWT token first (authenticated users)
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const decoded = request.server.jwt.verify<{ userId: string }>(token);
+        userId = decoded.userId;
+      } catch (error) {
+        // Token invalid or expired, fall back to query param
+        console.warn('Invalid JWT token in getMyActiveGames:', error);
+      }
+    }
+
+    // Fall back to query param (mobile app users without JWT)
+    if (!userId) {
+      userId = query.userId;
+    }
+
+    if (!userId) {
+      await reply.send({ games: [] });
+      return;
+    }
 
     // Find all games the player has joined that are still active or in lobby
     const playerRecords = await Player.find({ userId }).select('gameId ticket').lean();
