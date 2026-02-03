@@ -4,7 +4,10 @@ on:
   push:
     branches: [ dev ]
     paths:
-      - 'tambola-backend/**'
+      - 'src/**'
+      - 'prisma/**'
+      - 'Dockerfile'
+      - 'package*.json'
       - '.github/workflows/deploy-dev.yml'
   workflow_dispatch:
 
@@ -37,7 +40,6 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
-        working-directory: ./tambola-backend
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
