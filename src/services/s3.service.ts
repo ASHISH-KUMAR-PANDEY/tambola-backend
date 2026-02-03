@@ -44,7 +44,8 @@ export async function uploadToS3(
         Key: key,
         Body: fileBuffer,
         ContentType: mimeType,
-        ACL: 'public-read', // Make file publicly accessible
+        // Note: Not using ACL since bucket has ACLs disabled
+        // Public access is controlled by bucket policy instead
       },
     });
 
@@ -157,19 +158,10 @@ export async function getObjectFromS3(s3Key: string): Promise<Buffer> {
 
 /**
  * Set object ACL to public-read after upload
+ * Note: Bucket has ACLs disabled. Public access is controlled by bucket policy instead.
  */
 export async function setObjectPublicRead(s3Key: string): Promise<void> {
-  try {
-    const command = new PutObjectAclCommand({
-      Bucket: BUCKET_NAME,
-      Key: s3Key,
-      ACL: 'public-read',
-    });
-
-    await s3Client.send(command);
-    logger.info({ s3Key }, 'Set object ACL to public-read');
-  } catch (error) {
-    logger.error({ error, s3Key }, 'Failed to set object ACL');
-    throw new Error('Failed to set object ACL');
-  }
+  // No-op: Bucket policy already allows public reads to promotional-banners/*
+  // ACLs are disabled on this bucket (AWS best practice)
+  logger.info({ s3Key }, 'Object is publicly accessible via bucket policy (ACLs disabled)');
 }
