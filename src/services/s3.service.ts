@@ -139,12 +139,13 @@ export async function getObjectFromS3(s3Key: string): Promise<Buffer> {
 
     const response = await s3Client.send(command);
 
-    // Convert stream to buffer
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as any) {
-      chunks.push(chunk);
+    if (!response.Body) {
+      throw new Error('No body in S3 response');
     }
-    const buffer = Buffer.concat(chunks);
+
+    // Convert stream to buffer using transformToByteArray
+    const byteArray = await response.Body.transformToByteArray();
+    const buffer = Buffer.from(byteArray);
 
     logger.info({ s3Key, size: buffer.length }, 'Downloaded object from S3');
     return buffer;
