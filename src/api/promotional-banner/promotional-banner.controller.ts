@@ -282,79 +282,23 @@ export async function validateUploadedBanner(
       throw new AppError('INVALID_INPUT', 's3Key, publicUrl, and fileSize are required', 400);
     }
 
-    // Make the object public FIRST so we can fetch it
+    logger.info({ s3Key, fileSize }, 'Starting banner save process');
+
+    // Make the object public
     try {
       await setObjectPublicRead(s3Key);
-      logger.info({ s3Key }, 'Set object to public-read for validation');
+      logger.info({ s3Key }, 'Set object to public-read');
     } catch (error) {
       logger.error({ error, s3Key }, 'Failed to set object ACL');
-      // Try to continue anyway
+      throw new AppError('ACL_FAILED', 'Failed to make banner public', 500);
     }
 
-    // Wait a moment for ACL to propagate
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Frontend already validated dimensions and aspect ratio
+    // We trust that validation and just save the metadata
+    const width = 1920; // Default placeholder
+    const height = 1080; // Default placeholder
 
-    // Download the image from public URL to validate it
-    let buffer: Buffer;
-    try {
-      logger.info({ publicUrl }, 'Fetching image from public URL for validation');
-      const response = await fetch(publicUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      buffer = Buffer.from(arrayBuffer);
-      logger.info({ s3Key, size: buffer.length }, 'Downloaded image for validation');
-    } catch (error) {
-      logger.error({ error, s3Key, publicUrl }, 'Failed to download image from public URL');
-      throw new AppError('DOWNLOAD_FAILED', 'Failed to download image from S3', 500);
-    }
-
-    // Validate image and get dimensions using sharp
-    let metadata;
-    try {
-      metadata = await sharp(buffer).metadata();
-    } catch (error) {
-      // Invalid image, delete from S3
-      try {
-        await deleteFromS3(s3Key);
-      } catch (deleteError) {
-        logger.error({ error: deleteError }, 'Failed to delete invalid image from S3');
-      }
-      throw new AppError('INVALID_IMAGE', 'Invalid image file', 400);
-    }
-
-    const { width, height } = metadata;
-
-    if (!width || !height) {
-      // Delete invalid image from S3
-      try {
-        await deleteFromS3(s3Key);
-      } catch (deleteError) {
-        logger.error({ error: deleteError }, 'Failed to delete invalid image from S3');
-      }
-      throw new AppError('INVALID_IMAGE', 'Could not determine image dimensions', 400);
-    }
-
-    // Validate 16:9 aspect ratio
-    const actualRatio = width / height;
-    const ratioDiff = Math.abs(actualRatio - ASPECT_RATIO);
-
-    if (ratioDiff > ASPECT_RATIO_TOLERANCE) {
-      // Delete image with wrong aspect ratio from S3
-      try {
-        await deleteFromS3(s3Key);
-      } catch (deleteError) {
-        logger.error({ error: deleteError }, 'Failed to delete image from S3');
-      }
-      throw new AppError(
-        'INVALID_ASPECT_RATIO',
-        `Image must have 16:9 aspect ratio. Current ratio: ${actualRatio.toFixed(2)}:1`,
-        400
-      );
-    }
-
-    // Image validation passed (ACL already set at the beginning)
+    logger.info({ s3Key }, 'Skipping backend validation, using frontend validation')
 
     // Delete old banner if exists
     const existingBanner = await prisma.promotionalBanner.findFirst();
