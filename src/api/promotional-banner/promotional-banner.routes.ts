@@ -21,6 +21,20 @@ export async function promotionalBannerRoutes(
     controller.uploadBanner
   );
 
+  // Get presigned URL for direct S3 upload (organizer only)
+  fastify.post(
+    '/presigned-url',
+    { preHandler: [authMiddleware] },
+    controller.getPresignedUploadUrl
+  );
+
+  // Validate banner after direct S3 upload (organizer only)
+  fastify.post(
+    '/validate',
+    { preHandler: [authMiddleware] },
+    controller.validateUploadedBanner
+  );
+
   // Get current promotional banner (public)
   fastify.get('/', controller.getCurrentBanner);
 

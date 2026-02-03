@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { logger } from '../utils/logger.js';
 
@@ -82,4 +83,46 @@ export function extractS3Key(imageUrl: string): string {
     return urlParts[1];
   }
   throw new Error('Invalid S3 URL format');
+}
+
+/**
+ * Generate a presigned URL for direct browser-to-S3 upload
+ * @param fileName Original file name
+ * @param mimeType File MIME type (image/jpeg, image/png, image/webp)
+ * @returns Object containing presignedUrl, s3Key, and publicUrl
+ */
+export async function generatePresignedUploadUrl(
+  fileName: string,
+  mimeType: string
+): Promise<{ presignedUrl: string; s3Key: string; publicUrl: string }> {
+  try {
+    // Generate unique key with timestamp
+    const s3Key = `promotional-banners/${Date.now()}-${fileName}`;
+
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      ContentType: mimeType,
+      ACL: 'public-read',
+    });
+
+    // Generate presigned URL that expires in 15 minutes
+    const presignedUrl = await getSignedUrl(s3Client, command, {
+      expiresIn: 900, // 15 minutes
+    });
+
+    // Generate the public URL that will be accessible after upload
+    const publicUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
+
+    logger.info({ s3Key, fileName }, 'Generated presigned upload URL');
+
+    return {
+      presignedUrl,
+      s3Key,
+      publicUrl,
+    };
+  } catch (error) {
+    logger.error({ error, fileName }, 'Failed to generate presigned upload URL');
+    throw new Error('Failed to generate presigned upload URL');
+  }
 }
