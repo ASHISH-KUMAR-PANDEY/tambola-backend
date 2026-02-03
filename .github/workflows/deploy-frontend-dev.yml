@@ -1,0 +1,67 @@
+name: Deploy Frontend Dev to Amplify
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  AMPLIFY_APP_ID: d262mxsv2xemak
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Delete existing Amplify dev branch
+        run: |
+          echo "Deleting misconfigured Amplify dev branch..."
+
+          aws amplify delete-branch \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name dev \
+            --region ${{ env.AWS_REGION }} || echo "Branch doesn't exist or already deleted"
+
+          echo "✅ Old branch cleaned up"
+
+      - name: Wait for deletion to complete
+        run: sleep 5
+
+      - name: Create properly configured Amplify dev branch
+        run: |
+          echo "Creating Amplify dev branch connected to GitHub..."
+
+          aws amplify create-branch \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name dev \
+            --region ${{ env.AWS_REGION }} \
+            --enable-auto-build \
+            --framework "React" \
+            --stage DEVELOPMENT \
+            --environment-variables \
+              VITE_API_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com \
+              VITE_WS_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com
+
+          echo "✅ Amplify dev branch created"
+
+      - name: Trigger deployment
+        run: |
+          echo "Waiting for branch to be ready..."
+          sleep 10
+
+          echo "Triggering Amplify dev deployment..."
+          aws amplify start-job \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name dev \
+            --job-type RELEASE \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Deployment triggered!"
+          echo "🌐 Dev frontend will be available at: https://dev.d262mxsv2xemak.amplifyapp.com"
+          echo "⏱️  Deployment typically takes 2-3 minutes"
