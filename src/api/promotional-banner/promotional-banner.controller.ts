@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured, generatePresignedUploadUrl, setObjectPublicRead } from '../../services/s3.service.js';
+import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured, generatePresignedUploadUrl, setObjectPublicRead, getObjectFromS3 } from '../../services/s3.service.js';
 import { uploadToLocal, deleteFromLocal } from '../../services/localStorage.service.js';
 import { logger } from '../../utils/logger.js';
 
@@ -282,14 +282,14 @@ export async function validateUploadedBanner(
       throw new AppError('INVALID_INPUT', 's3Key, publicUrl, and fileSize are required', 400);
     }
 
-    // Download the image from S3 to validate it
-    const response = await fetch(publicUrl);
-    if (!response.ok) {
+    // Download the image from S3 to validate it (using AWS SDK, not public URL)
+    let buffer: Buffer;
+    try {
+      buffer = await getObjectFromS3(s3Key);
+    } catch (error) {
+      logger.error({ error, s3Key }, 'Failed to download image from S3');
       throw new AppError('DOWNLOAD_FAILED', 'Failed to download image from S3', 500);
     }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
 
     // Validate image and get dimensions using sharp
     let metadata;

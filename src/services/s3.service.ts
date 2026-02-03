@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, PutObjectAclCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, PutObjectAclCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { logger } from '../utils/logger.js';
@@ -124,6 +124,33 @@ export async function generatePresignedUploadUrl(
   } catch (error) {
     logger.error({ error, fileName }, 'Failed to generate presigned upload URL');
     throw new Error('Failed to generate presigned upload URL');
+  }
+}
+
+/**
+ * Get object from S3 as buffer
+ */
+export async function getObjectFromS3(s3Key: string): Promise<Buffer> {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+    });
+
+    const response = await s3Client.send(command);
+
+    // Convert stream to buffer
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of response.Body as any) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    logger.info({ s3Key, size: buffer.length }, 'Downloaded object from S3');
+    return buffer;
+  } catch (error) {
+    logger.error({ error, s3Key }, 'Failed to get object from S3');
+    throw new Error('Failed to get object from S3');
   }
 }
 
