@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, PutObjectAclCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
 import { logger } from '../utils/logger.js';
@@ -103,7 +103,7 @@ export async function generatePresignedUploadUrl(
       Bucket: BUCKET_NAME,
       Key: s3Key,
       ContentType: mimeType,
-      ACL: 'public-read',
+      // Note: Not including ACL here - will be set after validation
     });
 
     // Generate presigned URL that expires in 15 minutes
@@ -124,5 +124,24 @@ export async function generatePresignedUploadUrl(
   } catch (error) {
     logger.error({ error, fileName }, 'Failed to generate presigned upload URL');
     throw new Error('Failed to generate presigned upload URL');
+  }
+}
+
+/**
+ * Set object ACL to public-read after upload
+ */
+export async function setObjectPublicRead(s3Key: string): Promise<void> {
+  try {
+    const command = new PutObjectAclCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      ACL: 'public-read',
+    });
+
+    await s3Client.send(command);
+    logger.info({ s3Key }, 'Set object ACL to public-read');
+  } catch (error) {
+    logger.error({ error, s3Key }, 'Failed to set object ACL');
+    throw new Error('Failed to set object ACL');
   }
 }

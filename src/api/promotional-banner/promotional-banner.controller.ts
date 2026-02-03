@@ -3,7 +3,7 @@ import sharp from 'sharp';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured, generatePresignedUploadUrl } from '../../services/s3.service.js';
+import { uploadToS3, deleteFromS3, extractS3Key, isS3Configured, generatePresignedUploadUrl, setObjectPublicRead } from '../../services/s3.service.js';
 import { uploadToLocal, deleteFromLocal } from '../../services/localStorage.service.js';
 import { logger } from '../../utils/logger.js';
 
@@ -333,6 +333,14 @@ export async function validateUploadedBanner(
         `Image must have 16:9 aspect ratio. Current ratio: ${actualRatio.toFixed(2)}:1`,
         400
       );
+    }
+
+    // Image validation passed - set object ACL to public-read
+    try {
+      await setObjectPublicRead(s3Key);
+    } catch (error) {
+      logger.error({ error, s3Key }, 'Failed to set object ACL, but continuing');
+      // Continue even if ACL fails - object is already uploaded
     }
 
     // Delete old banner if exists
