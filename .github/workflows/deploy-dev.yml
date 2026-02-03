@@ -144,6 +144,39 @@ jobs:
 
       - name: Update Amplify Dev Environment
         run: |
+          echo "Fixing Amplify dev branch configuration..."
+
+          # Check if branch exists and delete it (one-time fix)
+          BRANCH_EXISTS=$(aws amplify list-branches \
+            --app-id d262mxsv2xemak \
+            --region ${{ env.AWS_REGION }} \
+            --query "branches[?branchName=='dev'].branchName" \
+            --output text 2>/dev/null || echo "")
+
+          if [ ! -z "$BRANCH_EXISTS" ]; then
+            echo "Deleting existing Amplify dev branch..."
+            aws amplify delete-branch \
+              --app-id d262mxsv2xemak \
+              --branch-name dev \
+              --region ${{ env.AWS_REGION }} || echo "Branch deletion skipped"
+
+            echo "Waiting for deletion..."
+            sleep 10
+          fi
+
+          echo "Creating Amplify dev branch properly connected to GitHub..."
+          aws amplify create-branch \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --region ${{ env.AWS_REGION }} \
+            --enable-auto-build \
+            --framework React \
+            --stage DEVELOPMENT \
+            --environment-variables "{\"VITE_API_URL\":\"https://jurpkxvw5m.ap-south-1.awsapprunner.com\",\"VITE_WS_URL\":\"https://jurpkxvw5m.ap-south-1.awsapprunner.com\"}" || echo "Branch already exists"
+
+          echo "Waiting for branch to be ready..."
+          sleep 15
+
           echo "Updating Amplify dev branch environment variables..."
 
           SERVICE_URL=$(aws apprunner describe-service \
