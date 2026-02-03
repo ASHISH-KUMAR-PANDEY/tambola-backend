@@ -1,0 +1,60 @@
+name: Fix Amplify Dev Branch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-amplify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Fix Amplify Dev Branch
+        run: |
+          echo "Step 1: Deleting misconfigured Amplify dev branch..."
+          aws amplify delete-branch \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --region ap-south-1 || echo "Branch deletion failed or doesn't exist"
+
+          echo "Step 2: Waiting for deletion..."
+          sleep 10
+
+          echo "Step 3: Creating properly configured dev branch..."
+          aws amplify create-branch \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --region ap-south-1 \
+            --enable-auto-build \
+            --framework React \
+            --stage DEVELOPMENT \
+            --environment-variables \
+              VITE_API_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com \
+              VITE_WS_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com
+
+          echo "Step 4: Waiting for branch creation..."
+          sleep 15
+
+          echo "Step 5: Triggering deployment..."
+          JOB_ID=$(aws amplify start-job \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --job-type RELEASE \
+            --region ap-south-1 \
+            --query 'jobSummary.jobId' \
+            --output text)
+
+          echo "========================================="
+          echo "✅ Amplify Dev Branch Fixed!"
+          echo "========================================="
+          echo "Job ID: $JOB_ID"
+          echo "Frontend URL: https://dev.d262mxsv2xemak.amplifyapp.com"
+          echo "Backend URL: https://jurpkxvw5m.ap-south-1.awsapprunner.com"
+          echo "========================================="
+          echo "⏱️  Deployment will complete in 2-3 minutes"
