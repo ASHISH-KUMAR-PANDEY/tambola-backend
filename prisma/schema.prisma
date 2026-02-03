@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,77 +7,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enums
-enum GameStatus {
-  LOBBY
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
-enum WinCategory {
-  EARLY_5
-  TOP_LINE
-  MIDDLE_LINE
-  BOTTOM_LINE
-  FULL_HOUSE
-}
-
-enum QueueStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  DEAD_LETTER
-}
-
-enum UserRole {
-  PLAYER
-  ORGANIZER
-}
-
-// Models
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
   name      String
-  role      UserRole @default(PLAYER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  role      UserRole @default(PLAYER)
 
   @@index([email])
 }
 
 model Game {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   scheduledTime DateTime
   startedAt     DateTime?
   endedAt       DateTime?
-  status        GameStatus  @default(LOBBY)
+  status        GameStatus   @default(LOBBY)
   createdBy     String
   prizes        Json
-  calledNumbers Int[]       @default([])
+  calledNumbers Int[]        @default([])
   currentNumber Int?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   players       Player[]
-  winners       Winner[]
   prizeQueue    PrizeQueue[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  winners       Winner[]
 
   @@index([scheduledTime, status])
   @@index([createdBy])
 }
 
 model Player {
-  id        String   @id @default(uuid())
-  gameId    String
-  userId    String
-  userName  String
-  ticket    Json     // Store full 3x9 grid structure as JSON
-  joinedAt  DateTime @default(now())
-  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  winners   Winner[]
+  id       String   @id @default(uuid())
+  gameId   String
+  userId   String
+  userName String
+  ticket   Json
+  joinedAt DateTime @default(now())
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  winners  Winner[]
 
   @@unique([gameId, userId])
   @@index([gameId, userId])
@@ -111,45 +78,45 @@ model PrizeQueue {
   attempts       Int         @default(0)
   lastAttempt    DateTime?
   error          String?
-  idempotencyKey String?     // Track external API idempotency
-  game           Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  idempotencyKey String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  game           Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, gameId, category])  // Prevent duplicate prize entries
+  @@unique([userId, gameId, category])
   @@index([status, createdAt])
   @@index([userId])
 }
 
 model PromotionalBanner {
-  id          String   @id @default(uuid())
-  imageUrl    String
-  s3Key       String?
-  uploadedBy  String?
-  width       Int?
-  height      Int?
-  fileSize    Int?
-  altText     String?
-  linkUrl     String?
-  isActive    Boolean  @default(true)
-  displayOrder Int     @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  imageUrl     String
+  altText      String?
+  linkUrl      String?
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  fileSize     Int?
+  height       Int?
+  s3Key        String?
+  uploadedBy   String?
+  width        Int?
 
   @@index([isActive, displayOrder])
 }
 
 model YouTubeEmbed {
-  id          String   @id @default(uuid())
-  videoId     String   @unique
-  embedId     String?
-  videoUrl    String?
-  title       String?
-  description String?
-  isActive    Boolean  @default(true)
-  displayOrder Int     @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  videoId      String   @unique
+  title        String?
+  description  String?
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  embedId      String?
+  videoUrl     String?
 
   @@index([isActive, displayOrder])
 }
@@ -157,13 +124,41 @@ model YouTubeEmbed {
 model YouTubeLiveStream {
   id          String   @id @default(uuid())
   embedId     String   @unique
-  videoUrl    String?
-  uploadedBy  String?
   title       String?
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  videoUrl    String?
+  uploadedBy  String?
 
   @@index([isActive])
+}
+
+enum GameStatus {
+  LOBBY
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum WinCategory {
+  EARLY_5
+  TOP_LINE
+  MIDDLE_LINE
+  BOTTOM_LINE
+  FULL_HOUSE
+}
+
+enum QueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DEAD_LETTER
+}
+
+enum UserRole {
+  PLAYER
+  ORGANIZER
 }

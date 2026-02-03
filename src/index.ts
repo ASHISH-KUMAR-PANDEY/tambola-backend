@@ -8,6 +8,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './utils/error.js';
 import { connectDatabase, disconnectDatabase } from './database/client.js';
+import { initializeDatabase } from './utils/db-init.js';
 import { redis } from './database/redis.js';
 import { getUploadsDir } from './services/localStorage.service.js';
 
@@ -260,6 +261,9 @@ async function closeGracefully(signal: string): Promise<void> {
 
 process.on('SIGTERM', () => closeGracefully('SIGTERM'));
 process.on('SIGINT', () => closeGracefully('SIGINT'));
+
+// Initialize database (creates dev database if needed)
+await initializeDatabase();
 
 // Connect to MongoDB
 await connectDatabase();
