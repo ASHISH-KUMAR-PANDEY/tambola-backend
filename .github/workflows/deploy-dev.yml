@@ -157,15 +157,16 @@ jobs:
 
           BACKEND_URL="https://$SERVICE_URL"
 
+          # Update Amplify environment variables
           aws amplify update-branch \
             --app-id d262mxsv2xemak \
             --branch-name dev \
             --region ${{ env.AWS_REGION }} \
-            --environment-variables \
-              VITE_API_URL=$BACKEND_URL \
-              VITE_WS_URL=$BACKEND_URL
+            --environment-variables "{\"VITE_API_URL\":\"$BACKEND_URL\",\"VITE_WS_URL\":\"$BACKEND_URL\"}"
 
           echo "✅ Amplify environment variables updated!"
+          echo "  VITE_API_URL=$BACKEND_URL"
+          echo "  VITE_WS_URL=$BACKEND_URL"
 
           # Trigger Amplify deployment
           aws amplify start-job \
