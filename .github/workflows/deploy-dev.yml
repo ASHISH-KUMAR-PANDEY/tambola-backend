@@ -141,3 +141,39 @@ jobs:
           echo "✅ DEV Backend deployed successfully!"
           echo "🌐 DEV Backend URL: https://$SERVICE_URL"
           echo "📊 Health check: https://$SERVICE_URL/health"
+
+      - name: Update Amplify Dev Environment
+        run: |
+          echo "Updating Amplify dev branch environment variables..."
+
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn $(aws apprunner list-services \
+              --region ${{ env.AWS_REGION }} \
+              --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+              --output text) \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.ServiceUrl' \
+            --output text)
+
+          BACKEND_URL="https://$SERVICE_URL"
+
+          aws amplify update-branch \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --region ${{ env.AWS_REGION }} \
+            --environment-variables \
+              VITE_API_URL=$BACKEND_URL \
+              VITE_WS_URL=$BACKEND_URL
+
+          echo "✅ Amplify environment variables updated!"
+
+          # Trigger Amplify deployment
+          aws amplify start-job \
+            --app-id d262mxsv2xemak \
+            --branch-name dev \
+            --job-type RELEASE \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Amplify dev deployment triggered!"
+          echo "🌐 Frontend will be available at: https://dev.d262mxsv2xemak.amplifyapp.com"
+          echo "⏱️  Frontend deployment typically takes 2-3 minutes"
