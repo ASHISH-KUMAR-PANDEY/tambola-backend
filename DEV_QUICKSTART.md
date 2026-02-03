@@ -145,16 +145,35 @@ aws apprunner list-services \
 
 ### Step 6: Update Amplify Dev Branch with Backend URL
 
-Once you have the dev backend URL from Step 5:
+✅ **Dev Backend URL:** `https://jurpkxvw5m.ap-south-1.awsapprunner.com`
 
+**Via AWS Console (Recommended):**
 1. Go to: https://console.aws.amazon.com/amplify/home?region=ap-south-1#/d262mxsv2xemak
 2. Select `dev` branch
 3. Click "Environment variables"
-4. Update:
-   - `VITE_API_URL`: `https://[dev-backend-url]`
-   - `VITE_WS_URL`: `https://[dev-backend-url]`
+4. Add/Update:
+   - `VITE_API_URL`: `https://jurpkxvw5m.ap-south-1.awsapprunner.com`
+   - `VITE_WS_URL`: `https://jurpkxvw5m.ap-south-1.awsapprunner.com`
 5. Click "Save"
 6. Redeploy the frontend branch
+
+**Via AWS CLI:**
+```bash
+aws amplify update-branch \
+  --app-id d262mxsv2xemak \
+  --branch-name dev \
+  --region ap-south-1 \
+  --environment-variables \
+    VITE_API_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com \
+    VITE_WS_URL=https://jurpkxvw5m.ap-south-1.awsapprunner.com
+
+# Trigger redeploy
+aws amplify start-job \
+  --app-id d262mxsv2xemak \
+  --branch-name dev \
+  --job-type RELEASE \
+  --region ap-south-1
+```
 
 ---
 
