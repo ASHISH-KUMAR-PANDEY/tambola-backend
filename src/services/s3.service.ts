@@ -103,7 +103,7 @@ export async function generatePresignedUploadUrl(
       Bucket: BUCKET_NAME,
       Key: s3Key,
       ContentType: mimeType,
-      ACL: 'public-read',
+      // Note: ACL removed - bucket should have public read policy instead
     });
 
     // Generate presigned URL that expires in 15 minutes
