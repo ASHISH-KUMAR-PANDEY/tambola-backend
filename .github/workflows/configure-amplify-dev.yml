@@ -1,0 +1,51 @@
+name: Configure Amplify Dev Environment
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  AMPLIFY_APP_ID: d262mxsv2xemak
+  DEV_BACKEND_URL: https://jurpkxvw5m.ap-south-1.awsapprunner.com
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Amplify Dev Branch Environment Variables
+        run: |
+          echo "Updating Amplify dev branch environment variables..."
+
+          aws amplify update-branch \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name dev \
+            --region ${{ env.AWS_REGION }} \
+            --environment-variables \
+              VITE_API_URL=${{ env.DEV_BACKEND_URL }} \
+              VITE_WS_URL=${{ env.DEV_BACKEND_URL }}
+
+          echo "✅ Environment variables updated successfully!"
+
+      - name: Trigger Amplify Dev Deployment
+        run: |
+          echo "Triggering Amplify dev branch deployment..."
+
+          JOB_ID=$(aws amplify start-job \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name dev \
+            --job-type RELEASE \
+            --region ${{ env.AWS_REGION }} \
+            --query 'jobSummary.jobId' \
+            --output text)
+
+          echo "✅ Deployment triggered! Job ID: $JOB_ID"
+          echo "🔗 Dev Frontend will be available at: https://dev.d262mxsv2xemak.amplifyapp.com"
+          echo "⏱️  Deployment typically takes 2-3 minutes"
