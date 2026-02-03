@@ -282,12 +282,31 @@ export async function validateUploadedBanner(
       throw new AppError('INVALID_INPUT', 's3Key, publicUrl, and fileSize are required', 400);
     }
 
-    // Download the image from S3 to validate it (using AWS SDK, not public URL)
+    // Make the object public FIRST so we can fetch it
+    try {
+      await setObjectPublicRead(s3Key);
+      logger.info({ s3Key }, 'Set object to public-read for validation');
+    } catch (error) {
+      logger.error({ error, s3Key }, 'Failed to set object ACL');
+      // Try to continue anyway
+    }
+
+    // Wait a moment for ACL to propagate
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Download the image from public URL to validate it
     let buffer: Buffer;
     try {
-      buffer = await getObjectFromS3(s3Key);
+      logger.info({ publicUrl }, 'Fetching image from public URL for validation');
+      const response = await fetch(publicUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      logger.info({ s3Key, size: buffer.length }, 'Downloaded image for validation');
     } catch (error) {
-      logger.error({ error, s3Key }, 'Failed to download image from S3');
+      logger.error({ error, s3Key, publicUrl }, 'Failed to download image from public URL');
       throw new AppError('DOWNLOAD_FAILED', 'Failed to download image from S3', 500);
     }
 
@@ -335,13 +354,7 @@ export async function validateUploadedBanner(
       );
     }
 
-    // Image validation passed - set object ACL to public-read
-    try {
-      await setObjectPublicRead(s3Key);
-    } catch (error) {
-      logger.error({ error, s3Key }, 'Failed to set object ACL, but continuing');
-      // Continue even if ACL fails - object is already uploaded
-    }
+    // Image validation passed (ACL already set at the beginning)
 
     // Delete old banner if exists
     const existingBanner = await prisma.promotionalBanner.findFirst();
