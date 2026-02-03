@@ -1,0 +1,141 @@
+name: Deploy Dev Backend to AWS App Runner
+
+on:
+  push:
+    branches: [ dev ]
+    paths:
+      - 'tambola-backend/**'
+      - '.github/workflows/deploy-dev.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: tambola-backend-dev
+  SERVICE_NAME: tambola-backend-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        working-directory: ./tambola-backend
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to App Runner
+        run: |
+          # Check if service exists
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "Creating new App Runner service for DEV..."
+            aws apprunner create-service \
+              --service-name ${{ env.SERVICE_NAME }} \
+              --region ${{ env.AWS_REGION }} \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"${{ steps.build-image.outputs.image }}\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"3000\",
+                    \"RuntimeEnvironmentVariables\": {
+                      \"DATABASE_URL\": \"${{ secrets.DEV_DATABASE_URL }}\",
+                      \"REDIS_URL\": \"${{ secrets.DEV_REDIS_URL }}\",
+                      \"JWT_SECRET\": \"${{ secrets.DEV_JWT_SECRET }}\",
+                      \"NODE_ENV\": \"development\",
+                      \"PORT\": \"3000\",
+                      \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
+                      \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\",
+                      \"AWS_REGION\": \"${{ env.AWS_REGION }}\",
+                      \"AWS_S3_BUCKET\": \"tambola-promotional-images-dev\",
+                      \"CORS_ORIGIN\": \"${{ secrets.DEV_FRONTEND_URL }}\",
+                      \"LOG_LEVEL\": \"debug\"
+                    }
+                  }
+                },
+                \"AutoDeploymentsEnabled\": true,
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::637436419278:role/AppRunnerECRAccessRole\"
+                }
+              }" \
+              --instance-configuration "{
+                \"Cpu\": \"0.25 vCPU\",
+                \"Memory\": \"0.5 GB\"
+              }" \
+              --health-check-configuration "{
+                \"Protocol\": \"HTTP\",
+                \"Path\": \"/health\",
+                \"Interval\": 10,
+                \"Timeout\": 5,
+                \"HealthyThreshold\": 1,
+                \"UnhealthyThreshold\": 5
+              }" \
+              --network-configuration "{
+                \"EgressConfiguration\": {
+                  \"EgressType\": \"VPC\",
+                  \"VpcConnectorArn\": \"${{ secrets.VPC_CONNECTOR_ARN }}\"
+                }
+              }" \
+              --tags "Key=Environment,Value=dev" "Key=ManagedBy,Value=GitHub-Actions"
+          else
+            echo "Updating existing App Runner service for DEV..."
+            aws apprunner update-service \
+              --service-arn $SERVICE_ARN \
+              --region ${{ env.AWS_REGION }} \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"${{ steps.build-image.outputs.image }}\",
+                  \"ImageRepositoryType\": \"ECR\"
+                }
+              }"
+          fi
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting for service to be running..."
+          sleep 60
+
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+
+          aws apprunner wait service-running \
+            --service-arn $SERVICE_ARN \
+            --region ${{ env.AWS_REGION }} || true
+
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn $SERVICE_ARN \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.ServiceUrl' \
+            --output text)
+
+          echo "✅ DEV Backend deployed successfully!"
+          echo "🌐 DEV Backend URL: https://$SERVICE_URL"
+          echo "📊 Health check: https://$SERVICE_URL/health"
