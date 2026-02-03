@@ -3,6 +3,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import fastifyStatic from '@fastify/static';
+import multipart from '@fastify/multipart';
 import { Server as SocketIOServer } from 'socket.io';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './utils/error.js';
@@ -13,11 +14,21 @@ import { getUploadsDir } from './services/localStorage.service.js';
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 // Validate required environment variables
 if (!JWT_SECRET) {
   logger.error('JWT_SECRET environment variable is required');
   process.exit(1);
+}
+
+// Parse CORS origins (support multiple comma-separated origins)
+const allowedOrigins: string[] = [];
+if (CORS_ORIGIN) {
+  allowedOrigins.push(...CORS_ORIGIN.split(',').map(o => o.trim()));
+}
+if (FRONTEND_URL && !allowedOrigins.includes(FRONTEND_URL)) {
+  allowedOrigins.push(FRONTEND_URL);
 }
 
 // Create Fastify instance
@@ -27,7 +38,21 @@ const fastify = Fastify({
 
 // Register CORS
 await fastify.register(cors, {
-  origin: CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // Check if origin is allowed
+    if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+      callback(null, true);
+    } else {
+      logger.warn({ origin, allowedOrigins }, 'CORS: Origin not allowed');
+      callback(new Error('Not allowed by CORS'), false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
@@ -35,6 +60,14 @@ await fastify.register(cors, {
 // Register JWT
 await fastify.register(jwt, {
   secret: JWT_SECRET,
+});
+
+// Register multipart for file uploads
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1, // Only one file at a time
+  },
 });
 
 // Register static file serving for uploads
@@ -68,7 +101,21 @@ await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-lives
 // Socket.IO setup
 const io = new SocketIOServer(fastify.server, {
   cors: {
-    origin: CORS_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // Check if origin is allowed
+      if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin, allowedOrigins }, 'Socket.IO CORS: Origin not allowed');
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
     credentials: true,
   },
   pingInterval: 10000,
