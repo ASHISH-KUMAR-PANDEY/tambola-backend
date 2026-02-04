@@ -1,0 +1,56 @@
+name: Reset App Runner Service
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  SERVICE_NAME: tambola-backend
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Service ARN
+        id: get-service
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+          echo "service_arn=$SERVICE_ARN" >> $GITHUB_OUTPUT
+          echo "Found service: $SERVICE_ARN"
+
+      - name: Check Service Status
+        run: |
+          aws apprunner describe-service \
+            --service-arn ${{ steps.get-service.outputs.service_arn }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.Status' \
+            --output text
+
+      - name: Pause Service
+        run: |
+          echo "Pausing App Runner service to reset stuck operation..."
+          aws apprunner pause-service \
+            --service-arn ${{ steps.get-service.outputs.service_arn }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Waiting 30 seconds for service to pause..."
+          sleep 30
+
+      - name: Resume Service
+        run: |
+          echo "Resuming App Runner service..."
+          aws apprunner resume-service \
+            --service-arn ${{ steps.get-service.outputs.service_arn }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Service reset complete. Wait 2-3 minutes before deploying again."
