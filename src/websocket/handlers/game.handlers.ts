@@ -220,7 +220,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       // Handle race condition: player already joined in another tab
       if (error.code === 'P2002') {
         // Unique constraint violation - player already exists
-        const existingPlayer = await prisma.player.findUnique({
+        let existingPlayer = await prisma.player.findUnique({
           where: {
             gameId_userId: {
               gameId,
@@ -230,6 +230,15 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         });
 
         if (existingPlayer) {
+          // Update userName if provided (user might have changed their name)
+          if (userName && userName !== existingPlayer.userName) {
+            existingPlayer = await prisma.player.update({
+              where: { id: existingPlayer.id },
+              data: { userName },
+            });
+            console.log('[handleGameJoin] Updated existing player userName to:', userName);
+          }
+
           socket.join(`game:${gameId}`);
 
           // Get all players and winners for state sync
