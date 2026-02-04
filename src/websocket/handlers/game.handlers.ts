@@ -37,6 +37,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
   try {
     const { gameId, userName: providedUserName } = joinGameSchema.parse(payload);
     const userId = socket.data.userId as string;
+    console.log('[handleGameJoin] Received userName:', JSON.stringify(providedUserName), 'type:', typeof providedUserName);
 
     // Check if game exists
     const game = await prisma.game.findUnique({
@@ -184,8 +185,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     const ticketGrid = generateTicket();
 
     // Get userName - use provided name, or try User collection, or fallback to userId
-    let userName = providedUserName;
-    if (!userName) {
+    let userName: string;
+    if (providedUserName && providedUserName.trim()) {
+      // Use provided name if it's a non-empty string
+      userName = providedUserName.trim();
+    } else {
+      // Fall back to User record or default
       userName = `Player ${userId.slice(-4)}`;
       try {
         const user = await prisma.user.findUnique({
