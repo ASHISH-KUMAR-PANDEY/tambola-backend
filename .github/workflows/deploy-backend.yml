@@ -144,3 +144,29 @@ jobs:
           echo "✅ Backend deployed successfully!"
           echo "🌐 Backend URL: https://$SERVICE_URL"
           echo "📊 Health check: https://$SERVICE_URL/health"
+
+      - name: Trigger Amplify Main Deployment
+        run: |
+          echo "Triggering Amplify main branch deployment..."
+
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn $(aws apprunner list-services \
+              --region ${{ env.AWS_REGION }} \
+              --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+              --output text) \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.ServiceUrl' \
+            --output text)
+
+          BACKEND_URL="https://$SERVICE_URL"
+
+          # Trigger Amplify deployment
+          aws amplify start-job \
+            --app-id d262mxsv2xemak \
+            --branch-name main \
+            --job-type RELEASE \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Amplify main deployment triggered!"
+          echo "🌐 Frontend will be available at: https://main.d262mxsv2xemak.amplifyapp.com"
+          echo "⏱️  Frontend deployment typically takes 2-3 minutes"
