@@ -11,6 +11,7 @@ import * as prizeService from '../../services/prize.service.js';
 // Validation schemas
 const joinGameSchema = z.object({
   gameId: z.string().uuid('Invalid UUID'),
+  userName: z.string().optional(),
 });
 
 const callNumberSchema = z.object({
@@ -34,7 +35,7 @@ const markNumberSchema = z.object({
  */
 export async function handleGameJoin(socket: Socket, payload: unknown): Promise<void> {
   try {
-    const { gameId } = joinGameSchema.parse(payload);
+    const { gameId, userName: providedUserName } = joinGameSchema.parse(payload);
     const userId = socket.data.userId as string;
 
     // Check if game exists
@@ -182,18 +183,21 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Generate ticket (3x9 grid)
     const ticketGrid = generateTicket();
 
-    // Get userName - try to fetch from User collection, fallback to userId
-    let userName = `Player ${userId.slice(-4)}`;
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { name: true, email: true },
-      });
-      if (user) {
-        userName = user.name || user.email;
+    // Get userName - use provided name, or try User collection, or fallback to userId
+    let userName = providedUserName;
+    if (!userName) {
+      userName = `Player ${userId.slice(-4)}`;
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true, email: true },
+        });
+        if (user) {
+          userName = user.name || user.email;
+        }
+      } catch (err) {
+        // User might not exist (mobile app users), use default
       }
-    } catch (err) {
-      // User might not exist (mobile app users), use default
     }
 
     let player;
