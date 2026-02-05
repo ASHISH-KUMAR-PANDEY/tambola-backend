@@ -619,7 +619,7 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       // Broadcast to all players and organizer in the game room (except the winner)
       socket.to(`game:${gameId}`).emit('game:winner', {
         playerId: player.id,
-        userName: user?.name || player.userName,
+        userName: player.userName || user?.name,  // Use entered name first, fallback to User table
         category,
       });
 
