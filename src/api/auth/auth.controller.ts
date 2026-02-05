@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcrypt';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
-import { loginSchema, signupSchema, type LoginInput, type SignupInput } from './auth.schema.js';
+import { loginSchema, signupSchema, mobileVerifySchema, type LoginInput, type SignupInput, type MobileVerifyInput } from './auth.schema.js';
 
 const SALT_ROUNDS = 10;
 
@@ -191,5 +191,71 @@ export async function validateUser(
     }
 
     throw new AppError('VALIDATION_FAILED', 'Failed to validate user', 500);
+  }
+}
+
+/**
+ * Verify mobile app token and return userId
+ * Used by Flutter WebView bridge for authentication
+ */
+export async function mobileVerify(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    // Validate request body
+    const body = mobileVerifySchema.parse(request.body);
+
+    console.log('[mobileVerify] Received token verification request');
+
+    // Verify JWT token
+    let decoded: any;
+    try {
+      decoded = request.server.jwt.verify(body.token);
+      console.log('[mobileVerify] Token verified successfully, userId:', decoded.userId);
+    } catch (error) {
+      console.error('[mobileVerify] Token verification failed:', error);
+      throw new AppError('INVALID_TOKEN', 'Invalid or expired token', 401);
+    }
+
+    // Extract userId from token payload
+    const userId = decoded.userId || decoded.id || decoded.sub;
+
+    if (!userId) {
+      console.error('[mobileVerify] No userId found in token payload');
+      throw new AppError('INVALID_TOKEN', 'Token does not contain userId', 401);
+    }
+
+    // Optionally verify user exists in database (add extra security)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    if (!user) {
+      console.warn('[mobileVerify] User not found for userId:', userId);
+      // Don't fail - mobile app users might not exist in User table
+      // They will be created when needed or use the app_user_id flow
+    }
+
+    console.log('[mobileVerify] Verification successful, returning userId:', userId);
+
+    await reply.send({
+      valid: true,
+      userId,
+      user: user ? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      } : null,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    console.error('[mobileVerify] Verification error:', error);
+    throw new AppError('VERIFICATION_FAILED', 'Failed to verify mobile token', 500);
   }
 }

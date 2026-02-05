@@ -12,5 +12,10 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+export const mobileVerifySchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+});
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type MobileVerifyInput = z.infer<typeof mobileVerifySchema>;
