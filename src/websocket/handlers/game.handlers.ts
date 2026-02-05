@@ -35,9 +35,17 @@ const markNumberSchema = z.object({
  */
 export async function handleGameJoin(socket: Socket, payload: unknown): Promise<void> {
   try {
+    console.log('[handleGameJoin] ===== GAME JOIN REQUEST =====');
+    console.log('[handleGameJoin] Raw payload:', JSON.stringify(payload));
     const { gameId, userName: providedUserName } = joinGameSchema.parse(payload);
     const userId = socket.data.userId as string;
-    console.log('[handleGameJoin] Received userName:', JSON.stringify(providedUserName), 'type:', typeof providedUserName);
+    console.log('[handleGameJoin] gameId:', gameId);
+    console.log('[handleGameJoin] userId:', userId);
+    console.log('[handleGameJoin] providedUserName:', JSON.stringify(providedUserName));
+    console.log('[handleGameJoin] providedUserName type:', typeof providedUserName);
+    console.log('[handleGameJoin] providedUserName length:', providedUserName?.length);
+    console.log('[handleGameJoin] providedUserName truthy?:', !!providedUserName);
+    console.log('[handleGameJoin] providedUserName.trim() truthy?:', !!(providedUserName && providedUserName.trim()));
 
     // Check if game exists
     const game = await prisma.game.findUnique({
@@ -186,10 +194,13 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
     // Get userName - use provided name, or try User collection, or fallback to userId
     let userName: string;
+    console.log('[handleGameJoin] ===== USERNAME RESOLUTION =====');
     if (providedUserName && providedUserName.trim()) {
       // Use provided name if it's a non-empty string
       userName = providedUserName.trim();
+      console.log('[handleGameJoin] ✓ Using PROVIDED userName:', userName);
     } else {
+      console.log('[handleGameJoin] ✗ No valid provided userName, falling back to database');
       // Fall back to User record or default
       userName = `Player ${userId.slice(-4)}`;
       try {
@@ -197,13 +208,21 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
           where: { id: userId },
           select: { name: true, email: true },
         });
+        console.log('[handleGameJoin] User record found:', !!user);
         if (user) {
+          console.log('[handleGameJoin] User.name:', user.name);
+          console.log('[handleGameJoin] User.email:', user.email);
           userName = user.name || user.email;
+          console.log('[handleGameJoin] ✓ Using database userName:', userName);
+        } else {
+          console.log('[handleGameJoin] ✓ No user record, using fallback:', userName);
         }
       } catch (err) {
-        // User might not exist (mobile app users), use default
+        console.log('[handleGameJoin] Error querying user:', err);
+        console.log('[handleGameJoin] ✓ Using fallback userName:', userName);
       }
     }
+    console.log('[handleGameJoin] FINAL userName:', userName);
 
     let player;
     try {
