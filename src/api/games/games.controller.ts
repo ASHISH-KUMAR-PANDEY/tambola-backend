@@ -132,6 +132,7 @@ export async function getGame(
           playerId: winner.playerId,
           category: winner.category,
           userName: player?.userName || 'Unknown',
+          appUserId: player?.userId || null,
         };
       })
     );
