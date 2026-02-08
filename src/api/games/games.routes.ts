@@ -7,6 +7,7 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/', gamesController.listGames);
   fastify.get('/my-active', gamesController.getMyActiveGames);
   fastify.get('/:gameId', gamesController.getGame);
+  fastify.get('/:gameId/players/:playerId', gamesController.getPlayerDetails);
 
   // Protected routes (require auth - organizer only)
   fastify.post('/', { onRequest: authMiddleware }, gamesController.createGame);

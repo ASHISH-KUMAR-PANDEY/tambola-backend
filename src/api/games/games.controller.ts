@@ -331,6 +331,81 @@ export async function getMyActiveGames(
   }
 }
 
+export async function getPlayerDetails(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { gameId, playerId } = request.params as { gameId: string; playerId: string };
+
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+      include: {
+        winners: true,
+        game: true,
+      },
+    });
+
+    if (!player) {
+      throw new AppError('PLAYER_NOT_FOUND', 'Player not found', 404);
+    }
+
+    if (player.gameId !== gameId) {
+      throw new AppError('PLAYER_NOT_IN_GAME', 'Player not in specified game', 400);
+    }
+
+    // Get prize queue data
+    const prizeQueue = await prisma.prizeQueue.findMany({
+      where: { userId: player.userId, gameId: player.gameId },
+    });
+
+    // Check if user is registered
+    const user = await prisma.user.findFirst({
+      where: { id: player.userId },
+    });
+
+    await reply.send({
+      player: {
+        id: player.id,
+        appUserId: player.userId,
+        userName: player.userName,
+        ticket: player.ticket,
+        joinedAt: player.joinedAt,
+        gameId: player.gameId,
+      },
+      winners: player.winners.map(w => ({
+        id: w.id,
+        category: w.category,
+        claimedAt: w.claimedAt,
+        prizeClaimed: w.prizeClaimed,
+        prizeValue: w.prizeValue,
+      })),
+      prizeQueue: prizeQueue.map(pq => ({
+        id: pq.id,
+        category: pq.category,
+        prizeValue: pq.prizeValue,
+        status: pq.status,
+        attempts: pq.attempts,
+        lastAttempt: pq.lastAttempt,
+        error: pq.error,
+        createdAt: pq.createdAt,
+      })),
+      user: user ? {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        createdAt: user.createdAt,
+      } : null,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError('GET_PLAYER_FAILED', 'Failed to fetch player details', 500);
+  }
+}
+
 export async function deleteGame(
   request: FastifyRequest,
   reply: FastifyReply
