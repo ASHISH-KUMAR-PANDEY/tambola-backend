@@ -1,0 +1,55 @@
+name: Update Amplify WebSocket URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Backend URL (without https://)'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ap-south-1
+  AMPLIFY_APP_ID: d262mxsv2xemak
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update both API and WebSocket URLs
+        run: |
+          BACKEND_URL="https://${{ inputs.backend_url }}"
+
+          echo "🔄 Updating environment variables:"
+          echo "   VITE_API_URL=$BACKEND_URL"
+          echo "   VITE_WS_URL=$BACKEND_URL"
+
+          aws amplify update-branch \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name main \
+            --region ${{ env.AWS_REGION }} \
+            --environment-variables "VITE_API_URL=$BACKEND_URL,VITE_WS_URL=$BACKEND_URL"
+
+          echo "✅ Environment variables updated"
+
+      - name: Trigger Amplify deployment
+        run: |
+          echo "🚀 Triggering Amplify deployment..."
+
+          aws amplify start-job \
+            --app-id ${{ env.AMPLIFY_APP_ID }} \
+            --branch-name main \
+            --job-type RELEASE \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Amplify deployment triggered"
+          echo "🌐 Frontend will be available at: https://main.d262mxsv2xemak.amplifyapp.com"
+          echo "⏱️  Deployment typically takes 2-3 minutes"
