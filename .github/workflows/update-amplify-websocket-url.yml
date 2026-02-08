@@ -24,19 +24,21 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update both API and WebSocket URLs
+      - name: Update all environment variables
         run: |
           BACKEND_URL="https://${{ inputs.backend_url }}"
 
           echo "🔄 Updating environment variables:"
           echo "   VITE_API_URL=$BACKEND_URL"
           echo "   VITE_WS_URL=$BACKEND_URL"
+          echo "   VITE_RUDDERSTACK_WRITE_KEY=***"
+          echo "   VITE_RUDDERSTACK_ENDPOINT=https://rudder-event-prod.stage.in"
 
           aws amplify update-branch \
             --app-id ${{ env.AMPLIFY_APP_ID }} \
             --branch-name main \
             --region ${{ env.AWS_REGION }} \
-            --environment-variables "VITE_API_URL=$BACKEND_URL,VITE_WS_URL=$BACKEND_URL"
+            --environment-variables "VITE_API_URL=$BACKEND_URL,VITE_WS_URL=$BACKEND_URL,VITE_RUDDERSTACK_WRITE_KEY=${{ secrets.RUDDERSTACK_WRITE_KEY }},VITE_RUDDERSTACK_ENDPOINT=https://rudder-event-prod.stage.in"
 
           echo "✅ Environment variables updated"
 
