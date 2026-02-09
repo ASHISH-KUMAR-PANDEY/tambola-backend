@@ -1,0 +1,78 @@
+name: Pause/Resume App Runner Service
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - pause
+          - resume
+
+env:
+  AWS_REGION: ap-south-1
+  SERVICE_NAME: tambola-backend
+
+jobs:
+  manage-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get service ARN
+        id: get-arn
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+
+          echo "SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_OUTPUT
+          echo "Service ARN: $SERVICE_ARN"
+
+      - name: Check current status
+        run: |
+          aws apprunner describe-service \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.{Status:Status,OperationStatus:OperationStatus}' \
+            --output table
+
+      - name: Pause service
+        if: ${{ github.event.inputs.action == 'pause' }}
+        run: |
+          echo "Pausing App Runner service..."
+          aws apprunner pause-service \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Service paused"
+
+      - name: Resume service
+        if: ${{ github.event.inputs.action == 'resume' }}
+        run: |
+          echo "Resuming App Runner service..."
+          aws apprunner resume-service \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }}
+
+          echo "✅ Service resumed"
+
+      - name: Wait for operation to complete
+        run: |
+          echo "Waiting for operation to complete..."
+          sleep 30
+
+          aws apprunner describe-service \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.{Status:Status,OperationStatus:OperationStatus}' \
+            --output table
