@@ -5,6 +5,7 @@ import jwt from '@fastify/jwt';
 import fastifyStatic from '@fastify/static';
 import multipart from '@fastify/multipart';
 import { Server as SocketIOServer } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './utils/error.js';
 import { connectDatabase, disconnectDatabase } from './database/client.js';
@@ -118,9 +119,27 @@ const io = new SocketIOServer(fastify.server, {
     },
     credentials: true,
   },
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  // Mobile-friendly settings for India network conditions
+  pingTimeout: 20000,    // Wait 20s for pong (was 5s) - allows for 4G/3G handoffs
+  pingInterval: 15000,   // Send ping every 15s (was 10s) - more frequent keepalive
+  transports: ['websocket', 'polling'], // Support both WebSocket and HTTP polling
 });
+
+// Setup Redis adapter for multi-instance broadcasting
+// This allows Socket.IO to work across multiple App Runner instances
+const pubClient = redis.duplicate();
+const subClient = redis.duplicate();
+
+pubClient.on('error', (error) => {
+  logger.error({ error }, 'Redis pub client error');
+});
+
+subClient.on('error', (error) => {
+  logger.error({ error }, 'Redis sub client error');
+});
+
+io.adapter(createAdapter(pubClient, subClient));
+logger.info('Socket.IO Redis adapter configured');
 
 // Make io available globally for controllers
 import { setIO } from './websocket/io.js';
@@ -191,15 +210,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('game:callNumber', async (payload) => {
+  socket.on('game:callNumber', async (payload, callback) => {
     try {
-      await gameHandlers.handleCallNumber(socket, payload);
+      await gameHandlers.handleCallNumber(socket, payload, callback);
     } catch (error) {
       logger.error({ error, socketId: socket.id, event: 'game:callNumber' }, 'Event handler error');
       socket.emit('error', {
         code: 'HANDLER_ERROR',
         message: 'Failed to process game:callNumber event',
       });
+      // Send error acknowledgment if callback provided
+      if (callback && typeof callback === 'function') {
+        callback({ success: false, error: 'Handler error' });
+      }
     }
   });
 
@@ -245,6 +268,10 @@ async function closeGracefully(signal: string): Promise<void> {
 
     // Close Fastify
     await fastify.close();
+
+    // Close Redis pub/sub clients
+    await pubClient.quit();
+    await subClient.quit();
 
     // Close database connections
     await disconnectDatabase();

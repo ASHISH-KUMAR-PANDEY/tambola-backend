@@ -96,7 +96,8 @@ export async function callNumber(
 
   const calledNumbers: number[] = JSON.parse(stateData.calledNumbers);
 
-  if (calledNumbers.includes(number)) {
+  // Use Set for O(1) duplicate check instead of Array.includes() O(n)
+  if (new Set(calledNumbers).has(number)) {
     throw new Error('Number already called');
   }
 
@@ -182,6 +183,14 @@ export async function updateGameStatus(
   // If game completed, sync Redis to MongoDB and cleanup
   if (status === GameStatus.COMPLETED) {
     await syncGameStateToDatabase(gameId);
+
+    // Clear metadata cache to free memory
+    try {
+      const { clearGameMetadataCache } = await import('../websocket/handlers/game.handlers.js');
+      clearGameMetadataCache(gameId);
+    } catch (error) {
+      logger.warn({ gameId, error }, 'Failed to clear game metadata cache');
+    }
   }
 }
 

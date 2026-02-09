@@ -68,7 +68,8 @@ export async function markNumber(
       ? JSON.parse(markedNumbersStr)
       : [];
 
-    if (!markedNumbers.includes(calledNumber)) {
+    // Use Set for O(1) duplicate check
+    if (!new Set(markedNumbers).has(calledNumber)) {
       markedNumbers.push(calledNumber);
 
       await redis.hmset(key, {

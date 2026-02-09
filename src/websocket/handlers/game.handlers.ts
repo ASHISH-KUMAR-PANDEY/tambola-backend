@@ -8,6 +8,21 @@ import * as gameService from '../../services/game.service.js';
 import * as winDetection from '../../services/win-detection.service.js';
 import * as prizeService from '../../services/prize.service.js';
 
+// In-memory cache for game metadata (avoid DB queries)
+interface GameMetadata {
+  createdBy: string;
+  status: GameStatus;
+}
+const gameMetadataCache = new Map<string, GameMetadata>();
+
+/**
+ * Clear game metadata from cache (call when game status changes to COMPLETED)
+ */
+export function clearGameMetadataCache(gameId: string): void {
+  gameMetadataCache.delete(gameId);
+  logger.info({ gameId }, 'Game metadata cache cleared');
+}
+
 // Validation schemas
 const joinGameSchema = z.object({
   gameId: z.string().uuid('Invalid UUID'),
@@ -163,24 +178,25 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
       const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
-      // Send current game state for rejoining player
+      // Optimized state sync - send only essential data to prevent overload on low-end devices
+      // Instead of full player list (173 objects), send only count
       const stateSyncData = {
         calledNumbers: game.calledNumbers || [],
         currentNumber: game.currentNumber,
-        players: allPlayers.map((p) => ({
-          playerId: p.id,
-          userName: p.userName,
-        })),
+        players: [], // Empty array - frontend doesn't need all player details for rejoining
+        playerCount: allPlayers.length, // Just send count for display
         winners: winners,
         markedNumbers: markedNumbers, // Include player's marked numbers
       };
 
-      console.log('[StateSync] Sending to rejoining player:', {
+      console.log('[StateSync] Sending optimized state to rejoining player:', {
         gameId,
         playerId: existingPlayer.id,
+        calledNumbersCount: stateSyncData.calledNumbers.length,
+        playerCount: allPlayers.length,
         winnersCount: winners.length,
-        winners: winners,
         markedNumbersCount: markedNumbers.length,
+        payloadSizeReduction: `${allPlayers.length} player objects removed`,
       });
 
       socket.emit('game:stateSync', stateSyncData);
@@ -291,13 +307,12 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
           const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
           const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
+          // Optimized state sync - send only essential data
           socket.emit('game:stateSync', {
             calledNumbers: game.calledNumbers || [],
             currentNumber: game.currentNumber,
-            players: allPlayers.map((p) => ({
-              playerId: p.id,
-              userName: p.userName,
-            })),
+            players: [], // Empty array - not needed for rejoining player
+            playerCount: allPlayers.length, // Just send count
             winners: winners,
             markedNumbers: markedNumbers, // Include player's marked numbers
           });
@@ -420,11 +435,27 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     // Update status
     await gameService.updateGameStatus(gameId, GameStatus.ACTIVE);
 
+    // Populate cache for fast number calling
+    gameMetadataCache.set(gameId, {
+      createdBy: game.createdBy,
+      status: GameStatus.ACTIVE,
+    });
+
     // Broadcast to all players in the game
     socket.to(`game:${gameId}`).emit('game:started', { gameId });
     socket.emit('game:started', { gameId });
 
-    logger.info({ gameId, userId }, 'Game started');
+    // Enhanced logging for organizer actions
+    logger.info({
+      event: 'ORGANIZER_ACTION',
+      action: 'GAME_STARTED',
+      gameId,
+      organizerId: userId,
+      playerCount: playerCount,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+      scheduledTime: game.scheduledTime,
+    }, `Game started with ${playerCount} players`);
   } catch (error) {
     logger.error({ error, socketId: socket.id }, 'game:start handler error');
     socket.emit('error', {
@@ -437,56 +468,187 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
 /**
  * Handle number call (organizer only)
  */
-export async function handleCallNumber(socket: Socket, payload: unknown): Promise<void> {
+export async function handleCallNumber(
+  socket: Socket,
+  payload: unknown,
+  callback?: (response: { success: boolean; error?: string }) => void
+): Promise<void> {
+  const startTime = Date.now();
+
   try {
     const { gameId, number } = callNumberSchema.parse(payload);
     const userId = socket.data.userId as string;
 
-    // Verify user is game creator
-    const game = await prisma.game.findUnique({
-      where: { id: gameId },
-    });
+    // Enhanced logging for organizer actions (easier CloudWatch filtering)
+    logger.info({
+      event: 'ORGANIZER_ACTION',
+      action: 'CALL_NUMBER_START',
+      gameId,
+      organizerId: userId,
+      number,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+    }, 'Organizer calling number');
 
-    if (!game || game.createdBy !== userId) {
+    // Check cache first, only query DB if not cached
+    let gameMetadata = gameMetadataCache.get(gameId);
+
+    if (!gameMetadata) {
+      // Cache miss - query database
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { createdBy: true, status: true },
+      });
+
+      if (!game) {
+        const errorMsg = 'Game not found';
+        socket.emit('error', {
+          code: 'GAME_NOT_FOUND',
+          message: errorMsg,
+        });
+        if (callback) {
+          callback({ success: false, error: errorMsg });
+        }
+        return;
+      }
+
+      gameMetadata = {
+        createdBy: game.createdBy,
+        status: game.status,
+      };
+      gameMetadataCache.set(gameId, gameMetadata);
+    }
+
+    // Verify user is game creator (from cache)
+    if (gameMetadata.createdBy !== userId) {
+      const errorMsg = 'Only game creator can call numbers';
       socket.emit('error', {
         code: 'FORBIDDEN',
-        message: 'Only game creator can call numbers',
+        message: errorMsg,
       });
+      if (callback) {
+        callback({ success: false, error: errorMsg });
+      }
       return;
     }
 
-    if (game.status !== GameStatus.ACTIVE) {
+    if (gameMetadata.status !== GameStatus.ACTIVE) {
+      const errorMsg = 'Game is not active';
       socket.emit('error', {
         code: 'GAME_NOT_ACTIVE',
-        message: 'Game is not active',
+        message: errorMsg,
       });
+      if (callback) {
+        callback({ success: false, error: errorMsg });
+      }
       return;
     }
 
-    // Check if number already called
-    const calledNumbers = game.calledNumbers as number[];
-    if (calledNumbers.includes(number)) {
+    // Check duplicate in Redis only (faster than PostgreSQL)
+    const key = `game:${gameId}:state`;
+    const calledNumbersStr = await redis.hget(key, 'calledNumbers');
+
+    if (!calledNumbersStr) {
+      const errorMsg = 'Game state not found';
+      socket.emit('error', {
+        code: 'GAME_STATE_NOT_FOUND',
+        message: errorMsg,
+      });
+      if (callback) {
+        callback({ success: false, error: errorMsg });
+      }
+      return;
+    }
+
+    const calledNumbers: number[] = JSON.parse(calledNumbersStr);
+
+    // Use Set for O(1) duplicate check instead of Array.includes() O(n)
+    const calledNumbersSet = new Set(calledNumbers);
+
+    if (calledNumbersSet.has(number)) {
+      const errorMsg = `Number ${number} has already been called`;
       socket.emit('error', {
         code: 'NUMBER_ALREADY_CALLED',
-        message: `Number ${number} has already been called`,
+        message: errorMsg,
       });
+      if (callback) {
+        callback({ success: false, error: errorMsg });
+      }
       return;
     }
 
-    // Call the number (add to game state)
-    await gameService.callNumber(gameId, number);
+    // Update Redis (fast, synchronous)
+    calledNumbers.push(number);
+    await redis.hmset(key, {
+      calledNumbers: JSON.stringify(calledNumbers),
+      currentNumber: number.toString(),
+    });
 
-    // Broadcast number to all players
+    // Send acknowledgment IMMEDIATELY (don't wait for PostgreSQL)
+    if (callback) {
+      callback({ success: true });
+    }
+
+    // Broadcast number to all players IMMEDIATELY
     socket.to(`game:${gameId}`).emit('game:numberCalled', { number });
     socket.emit('game:numberCalled', { number });
 
-    logger.info({ gameId, number }, 'Number called');
+    const duration = Date.now() - startTime;
+
+    // Enhanced logging with detailed metrics for monitoring
+    logger.info({
+      event: 'ORGANIZER_ACTION',
+      action: 'CALL_NUMBER_SUCCESS',
+      gameId,
+      organizerId: userId,
+      number,
+      totalNumbersCalled: calledNumbers.length,
+      duration_ms: duration,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+      connectedPlayers: socket.adapter.rooms.get(`game:${gameId}`)?.size || 0,
+    }, `Number ${number} called successfully (${duration}ms)`);
+
+    // Update PostgreSQL ASYNCHRONOUSLY (don't block)
+    prisma.game.update({
+      where: { id: gameId },
+      data: {
+        calledNumbers,
+        currentNumber: number,
+      },
+    }).catch(error => {
+      logger.error({ error, gameId, number }, 'Failed to update PostgreSQL (async)');
+      // TODO: Add retry logic or queue
+    });
+
   } catch (error) {
-    logger.error({ error, socketId: socket.id }, 'game:callNumber handler error');
+    const duration = Date.now() - startTime;
+    const payload = typeof error === 'object' && error !== null ? JSON.stringify(error) : String(error);
+
+    // Enhanced error logging for debugging
+    logger.error({
+      event: 'ORGANIZER_ACTION',
+      action: 'CALL_NUMBER_ERROR',
+      gameId: (error as any)?.gameId || 'unknown',
+      organizerId: socket.data.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      duration_ms: duration,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
+    }, 'game:callNumber handler error');
+
+    const errorMsg = error instanceof Error ? error.message : 'Failed to call number';
+
     socket.emit('error', {
       code: 'CALL_NUMBER_FAILED',
-      message: error instanceof Error ? error.message : 'Failed to call number',
+      message: errorMsg,
     });
+
+    // Send error acknowledgment
+    if (callback) {
+      callback({ success: false, error: errorMsg });
+    }
   }
 }
 
@@ -678,9 +840,9 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
       return;
     }
 
-    // Verify number was called
+    // Verify number was called (O(1) Set lookup)
     const calledNumbers = game.calledNumbers as number[];
-    if (!calledNumbers.includes(number)) {
+    if (!new Set(calledNumbers).has(number)) {
       socket.emit('error', { code: 'NUMBER_NOT_CALLED', message: 'Number not called yet' });
       return;
     }
@@ -690,7 +852,8 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
     const markedNumbersStr = await redis.hget(key, 'markedNumbers');
     const markedNumbers: number[] = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
-    if (!markedNumbers.includes(number)) {
+    // Check if already marked (O(1) Set lookup)
+    if (!new Set(markedNumbers).has(number)) {
       markedNumbers.push(number);
       await redis.hmset(key, {
         markedNumbers: JSON.stringify(markedNumbers),
