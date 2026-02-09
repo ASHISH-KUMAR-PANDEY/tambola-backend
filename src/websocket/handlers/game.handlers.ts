@@ -462,10 +462,11 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     });
 
     // Broadcast to all players in the game (including organizer)
-    // With Redis adapter: broadcast to room AND directly emit to sender as backup
+    // With Redis adapter: broadcast to room AND target sender by socket ID as backup
     const io = getIO();
     io.in(`game:${gameId}`).emit('game:started', { gameId });
-    socket.emit('game:started', { gameId });
+    // Target organizer by socket ID to ensure delivery
+    io.to(socket.id).emit('game:started', { gameId });
 
     // Enhanced logging for organizer actions
     logger.info({
@@ -612,10 +613,11 @@ export async function handleCallNumber(
     }
 
     // Broadcast number to all players IMMEDIATELY
-    // With Redis adapter: broadcast to room AND directly emit to sender as backup
+    // With Redis adapter: broadcast to room AND target sender by socket ID as backup
     const io = getIO();
     io.in(`game:${gameId}`).emit('game:numberCalled', { number });
-    socket.emit('game:numberCalled', { number });
+    // Target organizer by socket ID to ensure delivery even if room membership is stale
+    io.to(socket.id).emit('game:numberCalled', { number });
 
     const duration = Date.now() - startTime;
 
@@ -833,10 +835,11 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       const updatedState = await gameService.getGameState(gameId);
       if (updatedState?.wonCategories.has('FULL_HOUSE')) {
         await gameService.updateGameStatus(gameId, GameStatus.COMPLETED);
-        // Broadcast to room AND directly emit to sender as backup
+        // Broadcast to room AND target sender by socket ID as backup
         const io = getIO();
         io.in(`game:${gameId}`).emit('game:completed', { gameId });
-        socket.emit('game:completed', { gameId });
+        // Target claimer by socket ID to ensure delivery
+        io.to(socket.id).emit('game:completed', { gameId });
         logger.info({ gameId }, 'Game completed');
       }
     } finally {
