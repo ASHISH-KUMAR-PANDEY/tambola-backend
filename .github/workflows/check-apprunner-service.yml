@@ -1,0 +1,51 @@
+name: Check App Runner Service Status
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  SERVICE_NAME: tambola-backend
+
+jobs:
+  check-status:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get service ARN
+        id: get-arn
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region ${{ env.AWS_REGION }} \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.SERVICE_NAME }}'].ServiceArn" \
+            --output text)
+
+          echo "SERVICE_ARN=$SERVICE_ARN" >> $GITHUB_OUTPUT
+
+      - name: Get detailed service status
+        run: |
+          echo "========================================"
+          echo "App Runner Service Status"
+          echo "========================================"
+
+          aws apprunner describe-service \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Service.{Status:Status,ServiceUrl:ServiceUrl,CreatedAt:CreatedAt,UpdatedAt:UpdatedAt}' \
+            --output table
+
+          echo ""
+          echo "Current Operation:"
+          aws apprunner list-operations \
+            --service-arn ${{ steps.get-arn.outputs.SERVICE_ARN }} \
+            --region ${{ env.AWS_REGION }} \
+            --max-results 5 \
+            --query 'OperationSummaryList[*].{Type:Type,Status:Status,StartedAt:StartedAt,EndedAt:EndedAt}' \
+            --output table
