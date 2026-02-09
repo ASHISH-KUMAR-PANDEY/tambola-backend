@@ -166,10 +166,11 @@ io.use(async (socket, next) => {
 
 // Socket.IO event handlers
 import * as gameHandlers from './websocket/handlers/game.handlers.js';
+import { enhancedLogger } from './utils/enhanced-logger.js';
 
 io.on('connection', (socket) => {
-  logger.info(
-    { socketId: socket.id, userId: socket.data.userId },
+  enhancedLogger.websocketConnect(
+    { socketId: socket.id, userId: socket.data.userId, transport: socket.conn.transport.name },
     'Client connected'
   );
 
@@ -251,9 +252,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', (reason) => {
-    logger.info(
-      { socketId: socket.id, userId: socket.data.userId, reason },
-      'Client disconnected'
+    enhancedLogger.websocketDisconnect(
+      { socketId: socket.id, userId: socket.data.userId, reason, transport: socket.conn.transport.name },
+      `Client disconnected: ${reason}`
     );
   });
 });
@@ -290,6 +291,10 @@ process.on('SIGINT', () => closeGracefully('SIGINT'));
 
 // Connect to MongoDB
 await connectDatabase();
+
+// Print logging configuration
+import { printLoggingConfig } from './utils/logging-config.js';
+printLoggingConfig();
 
 // Start server
 try {

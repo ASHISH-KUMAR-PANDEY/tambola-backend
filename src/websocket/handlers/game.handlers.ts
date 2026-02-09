@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, GameStatus } from '../../models/index.js';
 import { redis } from '../../database/redis.js';
 import { logger } from '../../utils/logger.js';
+import { enhancedLogger, PerformanceTracker } from '../../utils/enhanced-logger.js';
 import { generateTicket, getTicketNumbers } from '../../services/ticket.service.js';
 import * as gameService from '../../services/game.service.js';
 import * as winDetection from '../../services/win-detection.service.js';
@@ -201,7 +202,10 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
 
       socket.emit('game:stateSync', stateSyncData);
 
-      logger.info({ gameId, userId, playerId: existingPlayer.id }, 'Player rejoined game');
+      enhancedLogger.playerJoin(
+        { gameId, userId, playerId: existingPlayer.id, isRejoin: true },
+        'Player rejoined game'
+      );
       return;
     }
 
@@ -317,7 +321,10 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
             markedNumbers: markedNumbers, // Include player's marked numbers
           });
 
-          logger.info({ gameId, userId, playerId: existingPlayer.id }, 'Player rejoined after race');
+          enhancedLogger.playerJoin(
+            { gameId, userId, playerId: existingPlayer.id, isRejoin: true, raceCondition: true },
+            'Player rejoined after race condition'
+          );
           return;
         }
       }
@@ -346,14 +353,23 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     });
 
     // Broadcast to room that a player joined
+    const broadcastStart = Date.now();
     socket.to(`game:${gameId}`).emit('game:playerJoined', {
       playerId: player.id,
       userName: player.userName,
     });
+    const broadcastDuration = Date.now() - broadcastStart;
 
-    logger.info({ gameId, userId, playerId: player.id }, 'Player joined game');
+    enhancedLogger.playerJoin(
+      { gameId, userId, playerId: player.id, userName: player.userName },
+      'Player joined game'
+    );
+
+    if (broadcastDuration > 0) {
+      enhancedLogger.broadcastTiming('game:playerJoined', broadcastDuration, 1, { gameId });
+    }
   } catch (error) {
-    logger.error({ error, socketId: socket.id }, 'game:join handler error');
+    enhancedLogger.error('GAME_JOIN', error, { gameId: (payload as any)?.gameId, userId: socket.data.userId }, 'game:join handler error');
     socket.emit('error', {
       code: 'JOIN_FAILED',
       message: error instanceof Error ? error.message : 'Failed to join game',
@@ -372,9 +388,12 @@ export async function handleGameLeave(socket: Socket, payload: unknown): Promise
 
     socket.emit('game:left', { gameId });
 
-    logger.info({ gameId, userId: socket.data.userId }, 'Player left game');
+    enhancedLogger.playerLeave(
+      { gameId, userId: socket.data.userId },
+      'Player left game'
+    );
   } catch (error) {
-    logger.error({ error, socketId: socket.id }, 'game:leave handler error');
+    enhancedLogger.error('GAME_LEAVE', error, { gameId: (payload as any)?.gameId, userId: socket.data.userId }, 'game:leave handler error');
     socket.emit('error', {
       code: 'LEAVE_FAILED',
       message: 'Failed to leave game',
@@ -655,9 +674,17 @@ export async function handleCallNumber(
  * Handle win claim (player claims a winning pattern)
  */
 export async function handleClaimWin(socket: Socket, payload: unknown): Promise<void> {
+  const tracker = new PerformanceTracker('claimWin', { gameId: (payload as any)?.gameId, category: (payload as any)?.category });
+
   try {
     const { gameId, category } = claimWinSchema.parse(payload);
     const userId = socket.data.userId as string;
+
+    // Log win claim attempt
+    enhancedLogger.playerWinClaim(
+      { gameId, userId, category, action: 'CLAIM_ATTEMPT' },
+      `Player attempting to claim ${category}`
+    );
 
     // Get game
     const game = await prisma.game.findUnique({
@@ -778,14 +805,24 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       });
 
       // Broadcast to all players and organizer in the game room (except the winner)
+      const broadcastStart = Date.now();
       socket.to(`game:${gameId}`).emit('game:winner', {
         playerId: player.id,
         userId: userId,  // Mobile app userId for analytics tracking
         userName: player.userName || user?.name,  // Use entered name first, fallback to User table
         category,
       });
+      const broadcastDuration = Date.now() - broadcastStart;
 
-      logger.info({ gameId, userId, playerId: player.id, category }, 'Win claimed successfully');
+      const duration = tracker.end({ success: true });
+      enhancedLogger.playerWinClaim(
+        { gameId, userId, playerId: player.id, category, duration_ms: duration, prizeValue },
+        `Win claimed successfully: ${category}`
+      );
+
+      if (broadcastDuration > 0) {
+        enhancedLogger.broadcastTiming('game:winner', broadcastDuration, 1, { gameId, category });
+      }
 
       // Check if game complete (all categories won)
       const updatedState = await gameService.getGameState(gameId);
@@ -799,7 +836,18 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       await redis.del(lockKey);
     }
   } catch (error) {
-    logger.error({ error, socketId: socket.id }, 'game:claimWin handler error');
+    const duration = tracker.getDuration();
+    enhancedLogger.error(
+      'WIN_CLAIM',
+      error,
+      {
+        gameId: (payload as any)?.gameId,
+        category: (payload as any)?.category,
+        userId: socket.data.userId,
+        duration_ms: duration
+      },
+      'game:claimWin handler error'
+    );
     socket.emit('error', {
       code: 'CLAIM_FAILED',
       message: error instanceof Error ? error.message : 'Failed to claim win',
@@ -859,10 +907,13 @@ export async function handleMarkNumber(socket: Socket, payload: unknown): Promis
         markedCount: markedNumbers.length.toString(),
       });
 
-      logger.info({ gameId, playerId, number, total: markedNumbers.length }, 'Player marked number');
+      enhancedLogger.playerMarkNumber(
+        { gameId, playerId, userId, number, totalMarked: markedNumbers.length },
+        `Player marked number ${number} (total: ${markedNumbers.length})`
+      );
     }
   } catch (error) {
-    logger.error({ error, socketId: socket.id }, 'game:markNumber handler error');
+    enhancedLogger.error('MARK_NUMBER', error, { gameId: (payload as any)?.gameId, playerId: (payload as any)?.playerId, userId: socket.data.userId }, 'game:markNumber handler error');
     socket.emit('error', {
       code: 'MARK_FAILED',
       message: error instanceof Error ? error.message : 'Failed to mark number',
