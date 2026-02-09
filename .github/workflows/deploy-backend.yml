@@ -4,7 +4,12 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'tambola-backend/**'
+      - 'src/**'
+      - 'prisma/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'Dockerfile'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
