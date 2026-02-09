@@ -115,6 +115,35 @@ jobs:
               }"
           else
             echo "Updating existing App Runner service..."
+
+            # Wait for any in-progress operations to complete
+            echo "Checking for in-progress operations..."
+            MAX_WAIT=300  # 5 minutes max wait
+            ELAPSED=0
+
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+              STATUS=$(aws apprunner describe-service \
+                --service-arn $SERVICE_ARN \
+                --region ${{ env.AWS_REGION }} \
+                --query 'Service.Status' \
+                --output text)
+
+              if [ "$STATUS" != "OPERATION_IN_PROGRESS" ]; then
+                echo "✅ Service ready (Status: $STATUS)"
+                break
+              fi
+
+              echo "⏳ Service is OPERATION_IN_PROGRESS, waiting... (${ELAPSED}s elapsed)"
+              sleep 15
+              ELAPSED=$((ELAPSED + 15))
+            done
+
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+              echo "❌ Timeout waiting for service to be ready"
+              exit 1
+            fi
+
+            # Now update the service
             aws apprunner update-service \
               --service-arn $SERVICE_ARN \
               --region ${{ env.AWS_REGION }} \
