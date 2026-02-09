@@ -1,0 +1,507 @@
+{
+  "players": [
+    {
+      "id": "34172f63-3386-4243-9f86-cd899c61049c",
+      "name": "TestPlayer01",
+      "email": "test-player-01@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzNDE3MmY2My0zMzg2LTQyNDMtOWY4Ni1jZDg5OWM2MTA0OWMiLCJlbWFpbCI6InRlc3QtcGxheWVyLTAxQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjB9.2yEVO_rW5JBE2xDQnQtJYgCCsPYPyeL_vT0qGzASiyo",
+      "createdAt": "2026-02-09T20:57:40.817Z"
+    },
+    {
+      "id": "8b28038f-5e96-4851-b6e1-9aae6e189210",
+      "name": "TestPlayer02",
+      "email": "test-player-02@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4YjI4MDM4Zi01ZTk2LTQ4NTEtYjZlMS05YWFlNmUxODkyMTAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTAyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjF9.AMuN6nRXfc4AYUoVnLnUKygYLez2tXgNNbPY3DcqMH8",
+      "createdAt": "2026-02-09T20:57:41.201Z"
+    },
+    {
+      "id": "3daef72f-6734-490f-ad4e-ba715e71c760",
+      "name": "TestPlayer03",
+      "email": "test-player-03@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzZGFlZjcyZi02NzM0LTQ5MGYtYWQ0ZS1iYTcxNWU3MWM3NjAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTAzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjF9.ihd1pN6-KCFv_z8ytlP9tscjk8xugVD3-_5-ik7s9gE",
+      "createdAt": "2026-02-09T20:57:41.511Z"
+    },
+    {
+      "id": "f339dc1c-0199-4fa0-a948-c9ac6a26a516",
+      "name": "TestPlayer04",
+      "email": "test-player-04@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmMzM5ZGMxYy0wMTk5LTRmYTAtYTk0OC1jOWFjNmEyNmE1MTYiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjF9.zw4rEktVKUZYv4fKM9bEhQOOTLDyXIPPiT4eh41aImM",
+      "createdAt": "2026-02-09T20:57:41.811Z"
+    },
+    {
+      "id": "89793af7-9163-469e-abd6-0a7ae63e54ce",
+      "name": "TestPlayer05",
+      "email": "test-player-05@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4OTc5M2FmNy05MTYzLTQ2OWUtYWJkNi0wYTdhZTYzZTU0Y2UiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjJ9.BmBxM32z1rY5guUGEdn8Q-c4EBGyNMXnL50IX0MnWlk",
+      "createdAt": "2026-02-09T20:57:42.095Z"
+    },
+    {
+      "id": "4c6111a1-f709-4c24-b194-d2ae2b38b984",
+      "name": "TestPlayer06",
+      "email": "test-player-06@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0YzYxMTFhMS1mNzA5LTRjMjQtYjE5NC1kMmFlMmIzOGI5ODQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA2QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjJ9.sJZt2xAi260U5Uv5KBU6Tj2YaaqkzsPYcIVgfSMmaHo",
+      "createdAt": "2026-02-09T20:57:42.391Z"
+    },
+    {
+      "id": "79a0301c-53cf-4aff-8db9-0dbcc47ff0f4",
+      "name": "TestPlayer07",
+      "email": "test-player-07@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3OWEwMzAxYy01M2NmLTRhZmYtOGRiOS0wZGJjYzQ3ZmYwZjQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA3QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjJ9.vYdcZYJV3oSpDwpFz64nujpdx0NTKUihyYuOSPMZd5Q",
+      "createdAt": "2026-02-09T20:57:42.739Z"
+    },
+    {
+      "id": "f5eba64b-eafb-4df6-af8d-1e6156253681",
+      "name": "TestPlayer08",
+      "email": "test-player-08@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmNWViYTY0Yi1lYWZiLTRkZjYtYWY4ZC0xZTYxNTYyNTM2ODEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA4QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjN9.sqx1Lj0GZUSUSeLvQZwpUG5rR53cHM3rCr-AVjNUFws",
+      "createdAt": "2026-02-09T20:57:43.003Z"
+    },
+    {
+      "id": "7c55e18d-9dc3-4945-8b78-8a401f56fb44",
+      "name": "TestPlayer09",
+      "email": "test-player-09@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3YzU1ZTE4ZC05ZGMzLTQ5NDUtOGI3OC04YTQwMWY1NmZiNDQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTA5QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjN9.mxJZ40ZPuI0zJbAb5tQIV7MCXx4foMgqyIDYcxyNdyE",
+      "createdAt": "2026-02-09T20:57:43.301Z"
+    },
+    {
+      "id": "ea5e209b-6a8c-4a6e-96c7-ec575d7589d4",
+      "name": "TestPlayer10",
+      "email": "test-player-10@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYTVlMjA5Yi02YThjLTRhNmUtOTZjNy1lYzU3NWQ3NTg5ZDQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTEwQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjN9.4pa7aPL9qyT0FcZJquS9wNlocfprX_tZenPks0_na1o",
+      "createdAt": "2026-02-09T20:57:43.597Z"
+    },
+    {
+      "id": "9bc60166-2ac0-4394-a143-4a6bce6668d5",
+      "name": "TestPlayer11",
+      "email": "test-player-11@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5YmM2MDE2Ni0yYWMwLTQzOTQtYTE0My00YTZiY2U2NjY4ZDUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTExQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjN9.aiFAOy7kDCjzoTjAvEC_S0hRZvM3xFO81VnrLbzTr8w",
+      "createdAt": "2026-02-09T20:57:43.897Z"
+    },
+    {
+      "id": "dbff225f-4245-43c6-b3f4-512e865eedcf",
+      "name": "TestPlayer12",
+      "email": "test-player-12@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkYmZmMjI1Zi00MjQ1LTQzYzYtYjNmNC01MTJlODY1ZWVkY2YiLCJlbWFpbCI6InRlc3QtcGxheWVyLTEyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjR9.5VyLrU5tWOPsE7E0CtYbF3kHFE9bQvPnHQHfy-kQLUk",
+      "createdAt": "2026-02-09T20:57:44.192Z"
+    },
+    {
+      "id": "15f3fecc-8549-4f89-9cb1-4ab1b14d7548",
+      "name": "TestPlayer13",
+      "email": "test-player-13@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxNWYzZmVjYy04NTQ5LTRmODktOWNiMS00YWIxYjE0ZDc1NDgiLCJlbWFpbCI6InRlc3QtcGxheWVyLTEzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjR9._8GpI5qqY9BJpRAntNO4TtxQEbXyZC-NzfZ2ih_K0nc",
+      "createdAt": "2026-02-09T20:57:44.490Z"
+    },
+    {
+      "id": "28fd7219-3b95-4676-a957-7f2e80ede297",
+      "name": "TestPlayer14",
+      "email": "test-player-14@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyOGZkNzIxOS0zYjk1LTQ2NzYtYTk1Ny03ZjJlODBlZGUyOTciLCJlbWFpbCI6InRlc3QtcGxheWVyLTE0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjR9.Yci_ghgBStrVkbE2J7D7BMPB3YzvdUxqlqdwz_3E5Fw",
+      "createdAt": "2026-02-09T20:57:44.789Z"
+    },
+    {
+      "id": "42b99865-1f0f-4e32-b6f2-143e765ac871",
+      "name": "TestPlayer15",
+      "email": "test-player-15@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0MmI5OTg2NS0xZjBmLTRlMzItYjZmMi0xNDNlNzY1YWM4NzEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTE1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjV9.wj8P0PNnkGkzWmpyAxlesMa5aRY8w8aZT3vmtE31JFM",
+      "createdAt": "2026-02-09T20:57:45.095Z"
+    },
+    {
+      "id": "1ae3608a-561d-467a-a807-2916a7b5c0bd",
+      "name": "TestPlayer16",
+      "email": "test-player-16@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYWUzNjA4YS01NjFkLTQ2N2EtYTgwNy0yOTE2YTdiNWMwYmQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTE2QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjV9.qn4sF31dQZWanL4RJYOvQ6kpxfETozLQ931LVYcwj-s",
+      "createdAt": "2026-02-09T20:57:45.300Z"
+    },
+    {
+      "id": "b951e96c-3059-4fb7-9041-43eef163a205",
+      "name": "TestPlayer17",
+      "email": "test-player-17@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiOTUxZTk2Yy0zMDU5LTRmYjctOTA0MS00M2VlZjE2M2EyMDUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTE3QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjV9.CCez4Rd_QjKx7iprKbTuqP3S6GeNubl0r_rxQUm6-z4",
+      "createdAt": "2026-02-09T20:57:45.604Z"
+    },
+    {
+      "id": "b51561bb-9f85-4cec-869a-3f1d6703c36e",
+      "name": "TestPlayer18",
+      "email": "test-player-18@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiNTE1NjFiYi05Zjg1LTRjZWMtODY5YS0zZjFkNjcwM2MzNmUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTE4QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjV9.IkiiG22OFnsswwLijwzKXe2DeKus2pTNWkra70i46lc",
+      "createdAt": "2026-02-09T20:57:45.900Z"
+    },
+    {
+      "id": "6a28755d-87df-4b44-87af-aff5db6b19ce",
+      "name": "TestPlayer19",
+      "email": "test-player-19@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTI4NzU1ZC04N2RmLTRiNDQtODdhZi1hZmY1ZGI2YjE5Y2UiLCJlbWFpbCI6InRlc3QtcGxheWVyLTE5QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjZ9.Xkuoqss2l0Tj2WOuHgqTVqNXp_ubBM7qQHIuQzOl_YE",
+      "createdAt": "2026-02-09T20:57:46.203Z"
+    },
+    {
+      "id": "fd5b5dd0-93f0-42e3-bd97-f50149b42289",
+      "name": "TestPlayer20",
+      "email": "test-player-20@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmZDViNWRkMC05M2YwLTQyZTMtYmQ5Ny1mNTAxNDliNDIyODkiLCJlbWFpbCI6InRlc3QtcGxheWVyLTIwQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjZ9.mH2wXYq7ObvkO5xypUmqiuUgN-S1Q2Q05yj8t0a4JXQ",
+      "createdAt": "2026-02-09T20:57:46.493Z"
+    },
+    {
+      "id": "59b43181-ccb6-4dfa-aa9a-250d8d729586",
+      "name": "TestPlayer21",
+      "email": "test-player-21@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1OWI0MzE4MS1jY2I2LTRkZmEtYWE5YS0yNTBkOGQ3Mjk1ODYiLCJlbWFpbCI6InRlc3QtcGxheWVyLTIxQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NjZ9.xi4qxzeXyC5V8ifOrqZrTDc-OarybEZRsxGRxB_jFQQ",
+      "createdAt": "2026-02-09T20:57:46.803Z"
+    },
+    {
+      "id": "9cbb17bc-9dd2-4980-9d50-35c1048be410",
+      "name": "TestPlayer22",
+      "email": "test-player-22@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5Y2JiMTdiYy05ZGQyLTQ5ODAtOWQ1MC0zNWMxMDQ4YmU0MTAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTIyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njd9.A551rwsa0GoWtJrOuCpgq_zboiJOfi03la616WuzR9U",
+      "createdAt": "2026-02-09T20:57:47.143Z"
+    },
+    {
+      "id": "a41a9c7a-0c86-44eb-84c8-32d8b8e163f9",
+      "name": "TestPlayer23",
+      "email": "test-player-23@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJhNDFhOWM3YS0wYzg2LTQ0ZWItODRjOC0zMmQ4YjhlMTYzZjkiLCJlbWFpbCI6InRlc3QtcGxheWVyLTIzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njd9.XJsPQ6k4JMyDPvZdXSKx5UpmqtylFE8QJKAChlXoRPA",
+      "createdAt": "2026-02-09T20:57:47.402Z"
+    },
+    {
+      "id": "30c1bd99-bc7d-4627-8c32-78fb973b979a",
+      "name": "TestPlayer24",
+      "email": "test-player-24@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzMGMxYmQ5OS1iYzdkLTQ2MjctOGMzMi03OGZiOTczYjk3OWEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njd9.HDpD9cafmjmgykIphMyy11BYvqPpVaqSAupe3moyYB8",
+      "createdAt": "2026-02-09T20:57:47.700Z"
+    },
+    {
+      "id": "ed3caf88-1ebb-4e57-9d3a-1b445c4d807f",
+      "name": "TestPlayer25",
+      "email": "test-player-25@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlZDNjYWY4OC0xZWJiLTRlNTctOWQzYS0xYjQ0NWM0ZDgwN2YiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njd9.wfFN6JdG-JW_7GSjwyHk_SvcGYcIsK3la5xZAVfnn_k",
+      "createdAt": "2026-02-09T20:57:47.995Z"
+    },
+    {
+      "id": "ebcb6b29-8b9c-4ef5-8c0f-33ba5b0c363d",
+      "name": "TestPlayer26",
+      "email": "test-player-26@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYmNiNmIyOS04YjljLTRlZjUtOGMwZi0zM2JhNWIwYzM2M2QiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI2QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njh9.-WvzEcYMa4CwJDF3Vxwj9tzIQ_MF5mDIVxbGLIdgM1M",
+      "createdAt": "2026-02-09T20:57:48.386Z"
+    },
+    {
+      "id": "fb74093f-e894-4870-86f4-582fcbbbe6ba",
+      "name": "TestPlayer27",
+      "email": "test-player-27@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmYjc0MDkzZi1lODk0LTQ4NzAtODZmNC01ODJmY2JiYmU2YmEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI3QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njh9.oVc99fbj9b01cMa3fQEAKdGvsCAvZQqm7pWB0aF03ao",
+      "createdAt": "2026-02-09T20:57:48.783Z"
+    },
+    {
+      "id": "e2c55142-c70b-4d0b-8196-256ed9b87178",
+      "name": "TestPlayer28",
+      "email": "test-player-28@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlMmM1NTE0Mi1jNzBiLTRkMGItODE5Ni0yNTZlZDliODcxNzgiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI4QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njl9.QYyFIUMCNb7SA0O8FR9pNTMmthN1mMdLq3liObBnZjw",
+      "createdAt": "2026-02-09T20:57:48.998Z"
+    },
+    {
+      "id": "d5432c9e-58ac-4080-917c-58b030941cb5",
+      "name": "TestPlayer29",
+      "email": "test-player-29@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJkNTQzMmM5ZS01OGFjLTQwODAtOTE3Yy01OGIwMzA5NDFjYjUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTI5QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njl9.2Y35B8B5nwHbugMmwUaCRi7uouAuJMsE0Ssek_2B_4o",
+      "createdAt": "2026-02-09T20:57:49.389Z"
+    },
+    {
+      "id": "ee80177a-afa7-4127-8031-acd1119f3f50",
+      "name": "TestPlayer30",
+      "email": "test-player-30@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlZTgwMTc3YS1hZmE3LTQxMjctODAzMS1hY2QxMTE5ZjNmNTAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTMwQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njl9.1fb2OqtY9fT3AHruyzgDmTydJ90R1vgtqKr-F29atc8",
+      "createdAt": "2026-02-09T20:57:49.688Z"
+    },
+    {
+      "id": "bee81a0e-861c-469a-9eb8-7d3181e6f14d",
+      "name": "TestPlayer31",
+      "email": "test-player-31@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiZWU4MWEwZS04NjFjLTQ2OWEtOWViOC03ZDMxODFlNmYxNGQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTMxQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2Njl9.c0ljVRaJKhvcKlUM-qJLAMmbpoDkYuPbfczc5eXPKY8",
+      "createdAt": "2026-02-09T20:57:49.991Z"
+    },
+    {
+      "id": "8c1fe9db-9488-4be5-b6b8-440bab4da6b8",
+      "name": "TestPlayer32",
+      "email": "test-player-32@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4YzFmZTlkYi05NDg4LTRiZTUtYjZiOC00NDBiYWI0ZGE2YjgiLCJlbWFpbCI6InRlc3QtcGxheWVyLTMyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzB9.mfeBDhLg1cRagnNikhPNYd1Q-RG366k067pkx2pP8Ww",
+      "createdAt": "2026-02-09T20:57:50.209Z"
+    },
+    {
+      "id": "1f62fd0e-c7a5-4a56-a504-c80eaeaa51b5",
+      "name": "TestPlayer33",
+      "email": "test-player-33@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxZjYyZmQwZS1jN2E1LTRhNTYtYTUwNC1jODBlYWVhYTUxYjUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTMzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzB9.M5GP-swTyjD50mXVE_5K92pXTmmsA00X4J_nzIkTUos",
+      "createdAt": "2026-02-09T20:57:50.505Z"
+    },
+    {
+      "id": "77e16384-0425-4952-afa2-e07b4a4161c0",
+      "name": "TestPlayer34",
+      "email": "test-player-34@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3N2UxNjM4NC0wNDI1LTQ5NTItYWZhMi1lMDdiNGE0MTYxYzAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTM0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzB9.zzjbY4empkETn3JZC74pA-N7_txJ3d0_SbvHTbKpRVw",
+      "createdAt": "2026-02-09T20:57:50.810Z"
+    },
+    {
+      "id": "7f5e4ff1-5af8-4a02-8211-eb5eec728c87",
+      "name": "TestPlayer35",
+      "email": "test-player-35@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3ZjVlNGZmMS01YWY4LTRhMDItODIxMS1lYjVlZWM3MjhjODciLCJlbWFpbCI6InRlc3QtcGxheWVyLTM1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzF9.yN2KFMZb55USqi5bZpDTIt62j5GkxqwNzdnZDYdLgyc",
+      "createdAt": "2026-02-09T20:57:51.102Z"
+    },
+    {
+      "id": "49bafbca-4343-4091-9e02-fd1ba448a705",
+      "name": "TestPlayer36",
+      "email": "test-player-36@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0OWJhZmJjYS00MzQzLTQwOTEtOWUwMi1mZDFiYTQ0OGE3MDUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTM2QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzF9.p4Lt-cYaroAC3FRLnNH2VLSY3U8qC0xRtRan7D9FTOc",
+      "createdAt": "2026-02-09T20:57:51.399Z"
+    },
+    {
+      "id": "fe685cf6-5a92-4a45-95c2-00b587748921",
+      "name": "TestPlayer37",
+      "email": "test-player-37@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmZTY4NWNmNi01YTkyLTRhNDUtOTVjMi0wMGI1ODc3NDg5MjEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTM3QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzF9.XbdZSWkUIboY3dOZkyg0PBXq4O_n4PkMu6gcw0ijw6s",
+      "createdAt": "2026-02-09T20:57:51.699Z"
+    },
+    {
+      "id": "e9b324bc-56ce-4abb-93e7-70c7f1849cbc",
+      "name": "TestPlayer38",
+      "email": "test-player-38@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlOWIzMjRiYy01NmNlLTRhYmItOTNlNy03MGM3ZjE4NDljYmMiLCJlbWFpbCI6InRlc3QtcGxheWVyLTM4QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzF9.cUAVxR9LS3RO4YqeW3OH9EWRsRg2JaZMZWSBLPRF7IE",
+      "createdAt": "2026-02-09T20:57:51.995Z"
+    },
+    {
+      "id": "46d77abd-00a0-4de9-adcf-0cdcbdd447ea",
+      "name": "TestPlayer39",
+      "email": "test-player-39@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0NmQ3N2FiZC0wMGEwLTRkZTktYWRjZi0wY2RjYmRkNDQ3ZWEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTM5QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzJ9.OOroSNoMtCNQYnr3PcBi2rV8ZYl0NyW6kj0LH777BZY",
+      "createdAt": "2026-02-09T20:57:52.280Z"
+    },
+    {
+      "id": "978c5a13-8f3f-4a51-9fd1-11f12cd43981",
+      "name": "TestPlayer40",
+      "email": "test-player-40@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5NzhjNWExMy04ZjNmLTRhNTEtOWZkMS0xMWYxMmNkNDM5ODEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQwQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzJ9._yxvr9C9l8FaCaYW00YVLXMN_SQpJb1Cr7FykeI4HyQ",
+      "createdAt": "2026-02-09T20:57:52.586Z"
+    },
+    {
+      "id": "b48678a7-1208-4e86-8223-2d24612f1032",
+      "name": "TestPlayer41",
+      "email": "test-player-41@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiNDg2NzhhNy0xMjA4LTRlODYtODIyMy0yZDI0NjEyZjEwMzIiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQxQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzJ9.vzboug4gR-AXc-GNqZz4a45phYOg4frslQ65fTzQQKU",
+      "createdAt": "2026-02-09T20:57:52.888Z"
+    },
+    {
+      "id": "38bef3f5-d550-4c54-bd2b-824ecd2653a7",
+      "name": "TestPlayer42",
+      "email": "test-player-42@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzOGJlZjNmNS1kNTUwLTRjNTQtYmQyYi04MjRlY2QyNjUzYTciLCJlbWFpbCI6InRlc3QtcGxheWVyLTQyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzN9.amyAB2WHMjCkuHuACYQJ0dHwKPowKV3tkPqCDuJZnms",
+      "createdAt": "2026-02-09T20:57:53.107Z"
+    },
+    {
+      "id": "691518f2-7518-4f96-8386-f1bbad1e0f23",
+      "name": "TestPlayer43",
+      "email": "test-player-43@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTE1MThmMi03NTE4LTRmOTYtODM4Ni1mMWJiYWQxZTBmMjMiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzN9.hG2p8pTKUSODoX-I_MfdeNGN-o59cwU7i88xo8L_m_4",
+      "createdAt": "2026-02-09T20:57:53.403Z"
+    },
+    {
+      "id": "ba839356-d156-4b41-b68a-eca352b93029",
+      "name": "TestPlayer44",
+      "email": "test-player-44@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiYTgzOTM1Ni1kMTU2LTRiNDEtYjY4YS1lY2EzNTJiOTMwMjkiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzN9.5aIzhJhoB1D12Hd3Ey4EOMERYci3yT3s5aKRHT6lKsc",
+      "createdAt": "2026-02-09T20:57:53.799Z"
+    },
+    {
+      "id": "eac7cdca-3fe4-45bb-82f4-3054e5fbea45",
+      "name": "TestPlayer45",
+      "email": "test-player-45@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYWM3Y2RjYS0zZmU0LTQ1YmItODJmNC0zMDU0ZTVmYmVhNDUiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzR9.n2OTb9YytCmlbsxI3Y6IMpNhzsZlScgmftVT-FU7bQY",
+      "createdAt": "2026-02-09T20:57:54.011Z"
+    },
+    {
+      "id": "60fb2bec-f5b8-40fd-9b44-7e8f37596ab0",
+      "name": "TestPlayer46",
+      "email": "test-player-46@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2MGZiMmJlYy1mNWI4LTQwZmQtOWI0NC03ZThmMzc1OTZhYjAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ2QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzR9.SMWjZWIxQOdOHodJ3P-wpVAigkZw365hAH_JEfZ6ts8",
+      "createdAt": "2026-02-09T20:57:54.300Z"
+    },
+    {
+      "id": "440d4adf-1d7a-4856-a689-84beebb81010",
+      "name": "TestPlayer47",
+      "email": "test-player-47@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI0NDBkNGFkZi0xZDdhLTQ4NTYtYTY4OS04NGJlZWJiODEwMTAiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ3QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzR9.0430xLFZNhYr65lm13t7S1KkpP9_Xh5gMJz_PAAZMTw",
+      "createdAt": "2026-02-09T20:57:54.597Z"
+    },
+    {
+      "id": "11c16fce-01c8-4bd7-83a6-7fc3fba3dc8a",
+      "name": "TestPlayer48",
+      "email": "test-player-48@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMWMxNmZjZS0wMWM4LTRiZDctODNhNi03ZmMzZmJhM2RjOGEiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ4QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzR9.8wOstPAkWfXV_EiXSM0nnjD1lNKoES_E9TOez53ZLEY",
+      "createdAt": "2026-02-09T20:57:54.902Z"
+    },
+    {
+      "id": "288e64db-c8ef-49a3-b710-ddb1fa942bbc",
+      "name": "TestPlayer49",
+      "email": "test-player-49@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyODhlNjRkYi1jOGVmLTQ5YTMtYjcxMC1kZGIxZmE5NDJiYmMiLCJlbWFpbCI6InRlc3QtcGxheWVyLTQ5QHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzV9.zJkwgx6j-tc-tQhicVJNPFom5W6lEnxsc5Yh1RPvrnM",
+      "createdAt": "2026-02-09T20:57:55.199Z"
+    },
+    {
+      "id": "8f5a7a1d-7988-4608-a511-22a5206634bd",
+      "name": "TestPlayer50",
+      "email": "test-player-50@tambola.test",
+      "password": "TestPass@123",
+      "role": "PLAYER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI4ZjVhN2ExZC03OTg4LTQ2MDgtYTUxMS0yMmE1MjA2NjM0YmQiLCJlbWFpbCI6InRlc3QtcGxheWVyLTUwQHRhbWJvbGEudGVzdCIsInJvbGUiOiJQTEFZRVIiLCJpYXQiOjE3NzA2NzA2NzV9.fGXqyvlXIGBdNYLb0euop52SRb1MiEtmxNF47lUu7Ys",
+      "createdAt": "2026-02-09T20:57:55.496Z"
+    }
+  ],
+  "organizers": [
+    {
+      "id": "7a3ce67f-14ad-4b06-9946-b85a03041734",
+      "name": "TestOrganizer01",
+      "email": "test-org-01@tambola.test",
+      "password": "TestPass@123",
+      "role": "ORGANIZER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3YTNjZTY3Zi0xNGFkLTRiMDYtOTk0Ni1iODVhMDMwNDE3MzQiLCJlbWFpbCI6InRlc3Qtb3JnLTAxQHRhbWJvbGEudGVzdCIsInJvbGUiOiJPUkdBTklaRVIiLCJpYXQiOjE3NzA2NzA2NzV9.QyLmX4LxXRJ1gHUYcQOK7mC5pl1V452HnaTMSEmPN2U",
+      "createdAt": "2026-02-09T20:57:55.810Z"
+    },
+    {
+      "id": "052762dd-fdb6-4d11-86d7-de5fce189f10",
+      "name": "TestOrganizer02",
+      "email": "test-org-02@tambola.test",
+      "password": "TestPass@123",
+      "role": "ORGANIZER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwNTI3NjJkZC1mZGI2LTRkMTEtODZkNy1kZTVmY2UxODlmMTAiLCJlbWFpbCI6InRlc3Qtb3JnLTAyQHRhbWJvbGEudGVzdCIsInJvbGUiOiJPUkdBTklaRVIiLCJpYXQiOjE3NzA2NzA2NzZ9.tGJbUq3NN3UHRzmYyFSCJZdvWrN_J_yJiZ28wZCkeO8",
+      "createdAt": "2026-02-09T20:57:56.089Z"
+    },
+    {
+      "id": "3d7adb34-d8c7-4b7f-b7b6-c283b675e528",
+      "name": "TestOrganizer03",
+      "email": "test-org-03@tambola.test",
+      "password": "TestPass@123",
+      "role": "ORGANIZER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzZDdhZGIzNC1kOGM3LTRiN2YtYjdiNi1jMjgzYjY3NWU1MjgiLCJlbWFpbCI6InRlc3Qtb3JnLTAzQHRhbWJvbGEudGVzdCIsInJvbGUiOiJPUkdBTklaRVIiLCJpYXQiOjE3NzA2NzA2NzZ9.P0jszRjY49lZfGuvQHHp2MXXcF4l7CD5vBS5S7vtTKw",
+      "createdAt": "2026-02-09T20:57:56.388Z"
+    },
+    {
+      "id": "93b2baf0-4c20-4c29-afa3-feaf6c7f1cc8",
+      "name": "TestOrganizer04",
+      "email": "test-org-04@tambola.test",
+      "password": "TestPass@123",
+      "role": "ORGANIZER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5M2IyYmFmMC00YzIwLTRjMjktYWZhMy1mZWFmNmM3ZjFjYzgiLCJlbWFpbCI6InRlc3Qtb3JnLTA0QHRhbWJvbGEudGVzdCIsInJvbGUiOiJPUkdBTklaRVIiLCJpYXQiOjE3NzA2NzA2NzZ9.Q60dMD2_EKmd8UCLBeJ8LdHOIsmMye-lz5fZXN1Jbl8",
+      "createdAt": "2026-02-09T20:57:56.609Z"
+    },
+    {
+      "id": "2f2d78da-8fa9-4a17-a9fb-586ec1644095",
+      "name": "TestOrganizer05",
+      "email": "test-org-05@tambola.test",
+      "password": "TestPass@123",
+      "role": "ORGANIZER",
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyZjJkNzhkYS04ZmE5LTRhMTctYTlmYi01ODZlYzE2NDQwOTUiLCJlbWFpbCI6InRlc3Qtb3JnLTA1QHRhbWJvbGEudGVzdCIsInJvbGUiOiJPUkdBTklaRVIiLCJpYXQiOjE3NzA2NzA2NzZ9.MHfC6yeMV79T_NkwNX4B-Qlx8SLg8tq3_KvhBw5L8wI",
+      "createdAt": "2026-02-09T20:57:56.907Z"
+    }
+  ],
+  "metadata": {
+    "createdAt": "2026-02-09T20:57:40.287Z",
+    "backendUrl": "https://nhuh2kfbwk.ap-south-1.awsapprunner.com",
+    "playerCount": 50,
+    "organizerCount": 5
+  }
+}

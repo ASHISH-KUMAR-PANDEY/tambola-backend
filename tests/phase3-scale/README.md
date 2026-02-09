@@ -63,7 +63,7 @@ npx playwright install chromium
 
 ### Environment Variables
 ```bash
-export BACKEND_URL="https://jurpkxvw5m.ap-south-1.awsapprunner.com"
+export BACKEND_URL="https://nhuh2kfbwk.ap-south-1.awsapprunner.com"
 export FRONTEND_URL="https://main.d262mxsv2xemak.amplifyapp.com"
 ```
 

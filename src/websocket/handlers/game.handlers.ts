@@ -462,8 +462,10 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     });
 
     // Broadcast to all players in the game (including organizer)
+    // With Redis adapter: broadcast to room AND directly emit to sender as backup
     const io = getIO();
     io.in(`game:${gameId}`).emit('game:started', { gameId });
+    socket.emit('game:started', { gameId });
 
     // Enhanced logging for organizer actions
     logger.info({
@@ -609,10 +611,11 @@ export async function handleCallNumber(
       callback({ success: true });
     }
 
-    // Broadcast number to all players IMMEDIATELY (including sender)
-    // Using io.in() instead of socket.to() + socket.emit() to avoid Redis adapter race conditions
+    // Broadcast number to all players IMMEDIATELY
+    // With Redis adapter: broadcast to room AND directly emit to sender as backup
     const io = getIO();
     io.in(`game:${gameId}`).emit('game:numberCalled', { number });
+    socket.emit('game:numberCalled', { number });
 
     const duration = Date.now() - startTime;
 
@@ -830,8 +833,10 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       const updatedState = await gameService.getGameState(gameId);
       if (updatedState?.wonCategories.has('FULL_HOUSE')) {
         await gameService.updateGameStatus(gameId, GameStatus.COMPLETED);
+        // Broadcast to room AND directly emit to sender as backup
         const io = getIO();
         io.in(`game:${gameId}`).emit('game:completed', { gameId });
+        socket.emit('game:completed', { gameId });
         logger.info({ gameId }, 'Game completed');
       }
     } finally {
