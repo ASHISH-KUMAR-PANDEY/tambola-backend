@@ -32,6 +32,7 @@ export class Organizer {
   private debug: boolean;
 
   public gameId: string | null = null;
+  private calledNumbersSet: Set<number> = new Set();
 
   constructor(options: OrganizerOptions) {
     this.browser = options.browser;
@@ -93,6 +94,9 @@ export class Organizer {
 
   async createGame(prizes?: any): Promise<string> {
     const API_URL = `${this.backendUrl}/api/v1`;
+
+    // Reset called numbers for new game
+    this.calledNumbersSet.clear();
 
     const defaultPrizes = {
       early5: 100,
@@ -172,32 +176,23 @@ export class Organizer {
     }
 
     return new Promise((resolve, reject) => {
-      let resolved = false;
-      let timeoutId: NodeJS.Timeout;
+      const timeoutId = setTimeout(() => {
+        reject(new Error(`Call number ${number} timeout - no acknowledgment`));
+      }, 5000);
 
-      const handler = (data: any) => {
-        if (data.number === number && !resolved) {
-          resolved = true;
-          clearTimeout(timeoutId);
-          this.socket!.removeListener('game:numberCalled', handler);
+      // Use callback acknowledgment instead of listening for broadcast
+      // This bypasses the broken Socket.IO Redis adapter broadcast issue
+      this.socket!.emit('game:callNumber', { gameId: this.gameId, number }, (response: any) => {
+        clearTimeout(timeoutId);
+
+        if (response && response.success) {
+          this.calledNumbersSet.add(number);
           this.log(`Number called: ${number}`);
           resolve();
+        } else {
+          reject(new Error(`Call number ${number} failed: ${response?.error || 'Unknown error'}`));
         }
-      };
-
-      // Add listener BEFORE emitting to avoid race condition
-      this.socket!.on('game:numberCalled', handler);
-
-      // Emit the call number request
-      this.socket!.emit('game:callNumber', { gameId: this.gameId, number });
-
-      timeoutId = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          this.socket!.removeListener('game:numberCalled', handler);
-          reject(new Error(`Call number ${number} timeout`));
-        }
-      }, 5000);
+      });
     });
   }
 
@@ -210,7 +205,13 @@ export class Organizer {
 
   async callRandomNumbers(count: number, delayMs: number = 1000): Promise<number[]> {
     const calledNumbers: number[] = [];
-    const available = Array.from({ length: 90 }, (_, i) => i + 1);
+    // Only pick from numbers that haven't been called yet
+    const available = Array.from({ length: 90 }, (_, i) => i + 1)
+      .filter(n => !this.calledNumbersSet.has(n));
+
+    if (available.length < count) {
+      throw new Error(`Not enough numbers available (need ${count}, have ${available.length})`);
+    }
 
     // Shuffle
     for (let i = available.length - 1; i > 0; i--) {
@@ -222,6 +223,7 @@ export class Organizer {
 
     for (const number of numbersToCall) {
       await this.callNumber(number);
+      // callNumber() already adds to calledNumbersSet
       calledNumbers.push(number);
       await this.sleep(delayMs);
     }
