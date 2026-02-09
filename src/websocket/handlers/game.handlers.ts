@@ -75,8 +75,9 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     }
 
     // Allow game creator (organizer) to join as observer without player record
+    // NOTE: Organizer does NOT join the game room to avoid Redis adapter race conditions
+    // They will receive broadcasts via direct socket.emit() in event handlers
     if (game.createdBy === userId) {
-      socket.join(`game:${gameId}`);
 
       // Get all players and winners
       const allPlayers = await prisma.player.findMany({
