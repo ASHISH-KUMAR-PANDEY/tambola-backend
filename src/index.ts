@@ -252,8 +252,17 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', (reason) => {
+    // Explicit room cleanup to keep Redis adapter state clean
+    // While Socket.IO should auto-remove from rooms, explicit cleanup helps prevent race conditions
+    const rooms = Array.from(socket.rooms);
+    rooms.forEach(room => {
+      if (room !== socket.id) { // Don't leave the socket's own room
+        socket.leave(room);
+      }
+    });
+
     enhancedLogger.websocketDisconnect(
-      { socketId: socket.id, userId: socket.data.userId, reason, transport: socket.conn.transport.name },
+      { socketId: socket.id, userId: socket.data.userId, reason, transport: socket.conn.transport.name, rooms },
       `Client disconnected: ${reason}`
     );
   });

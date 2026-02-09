@@ -8,6 +8,7 @@ import { generateTicket, getTicketNumbers } from '../../services/ticket.service.
 import * as gameService from '../../services/game.service.js';
 import * as winDetection from '../../services/win-detection.service.js';
 import * as prizeService from '../../services/prize.service.js';
+import { getIO } from '../io.js';
 
 // In-memory cache for game metadata (avoid DB queries)
 interface GameMetadata {
@@ -460,9 +461,9 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       status: GameStatus.ACTIVE,
     });
 
-    // Broadcast to all players in the game
-    socket.to(`game:${gameId}`).emit('game:started', { gameId });
-    socket.emit('game:started', { gameId });
+    // Broadcast to all players in the game (including organizer)
+    const io = getIO();
+    io.in(`game:${gameId}`).emit('game:started', { gameId });
 
     // Enhanced logging for organizer actions
     logger.info({
@@ -608,9 +609,10 @@ export async function handleCallNumber(
       callback({ success: true });
     }
 
-    // Broadcast number to all players IMMEDIATELY
-    socket.to(`game:${gameId}`).emit('game:numberCalled', { number });
-    socket.emit('game:numberCalled', { number });
+    // Broadcast number to all players IMMEDIATELY (including sender)
+    // Using io.in() instead of socket.to() + socket.emit() to avoid Redis adapter race conditions
+    const io = getIO();
+    io.in(`game:${gameId}`).emit('game:numberCalled', { number });
 
     const duration = Date.now() - startTime;
 
@@ -828,8 +830,8 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       const updatedState = await gameService.getGameState(gameId);
       if (updatedState?.wonCategories.has('FULL_HOUSE')) {
         await gameService.updateGameStatus(gameId, GameStatus.COMPLETED);
-        socket.to(`game:${gameId}`).emit('game:completed', { gameId });
-        socket.emit('game:completed', { gameId });
+        const io = getIO();
+        io.in(`game:${gameId}`).emit('game:completed', { gameId });
         logger.info({ gameId }, 'Game completed');
       }
     } finally {
