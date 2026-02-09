@@ -313,3 +313,4 @@ try {
   logger.error({ error }, 'Failed to start server');
   process.exit(1);
 }
+// Trigger deployment with Socket.IO fix
