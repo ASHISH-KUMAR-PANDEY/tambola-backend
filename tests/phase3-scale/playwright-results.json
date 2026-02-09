@@ -95,7 +95,7 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "failed",
-                      "duration": 55624,
+                      "duration": 56131,
                       "error": {
                         "message": "Error: Call number 77 timeout",
                         "stack": "Error: Call number 77 timeout\n    at Timeout._onTimeout (/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts:198:18)",
@@ -133,7 +133,7 @@
                           "text": "Step 1: Setting up organizer...\n"
                         },
                         {
-                          "text": "✅ Organizer ready, game: 52b86363-80a2-43c8-86cb-fdc3cac42080\n\n"
+                          "text": "✅ Organizer ready, game: 1b8d5413-7cfc-4afc-b9db-903c6b364946\n\n"
                         },
                         {
                           "text": "Step 2: Connecting 50 socket players...\n"
@@ -187,13 +187,13 @@
                           "text": "  State of first 3 leaving players:\n"
                         },
                         {
-                          "text": "    TestPlayer01: marked=2, called=30\n"
+                          "text": "    TestPlayer01: marked=5, called=30\n"
                         },
                         {
-                          "text": "    TestPlayer02: marked=4, called=30\n"
+                          "text": "    TestPlayer02: marked=6, called=30\n"
                         },
                         {
-                          "text": "    TestPlayer03: marked=6, called=30\n"
+                          "text": "    TestPlayer03: marked=4, called=30\n"
                         },
                         {
                           "text": "✅ State recorded\n\n"
@@ -210,7 +210,7 @@
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-02-09T21:33:30.545Z",
+                      "startTime": "2026-02-09T21:41:38.031Z",
                       "annotations": [],
                       "attachments": [
                         {
@@ -241,8 +241,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-02-09T21:33:29.973Z",
-    "duration": 56252.508,
+    "startTime": "2026-02-09T21:41:37.436Z",
+    "duration": 56800.421,
     "expected": 0,
     "skipped": 0,
     "unexpected": 1,
