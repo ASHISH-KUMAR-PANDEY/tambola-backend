@@ -1,0 +1,80 @@
+[
+  {
+    "testNumber": 1,
+    "testName": "Hard refresh after marking 3 numbers",
+    "passed": false,
+    "timestamp": "2026-02-09T16:42:51.582Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 2,
+    "testName": "Hard refresh after marking 10 numbers",
+    "passed": false,
+    "timestamp": "2026-02-09T16:43:05.277Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 3,
+    "testName": "Hard refresh after game completion",
+    "passed": false,
+    "timestamp": "2026-02-09T16:43:18.919Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 4,
+    "testName": "Brief network disconnection (5s) with 5 marked numbers",
+    "passed": true,
+    "timestamp": "2026-02-09T16:43:37.512Z",
+    "markedBefore": 3,
+    "markedAfter": 3,
+    "calledAfter": 10
+  },
+  {
+    "testNumber": 5,
+    "testName": "Long network disconnection (2 min) with 10 marked numbers",
+    "passed": true,
+    "timestamp": "2026-02-09T16:44:03.960Z",
+    "markedBefore": 5,
+    "markedAfter": 5,
+    "disconnectDuration": "10s (simulated 2min)"
+  },
+  {
+    "testNumber": 6,
+    "testName": "Numbers called during disconnect are synced on reconnect",
+    "passed": true,
+    "timestamp": "2026-02-09T16:44:16.431Z",
+    "calledBefore": 5,
+    "calledAfter": 10,
+    "missedNumbers": 5
+  },
+  {
+    "testNumber": 7,
+    "testName": "Close tab and reopen via link",
+    "passed": false,
+    "timestamp": "2026-02-09T16:44:30.188Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 8,
+    "testName": "Multiple tabs for same game - state sync",
+    "passed": false,
+    "timestamp": "2026-02-09T16:44:43.822Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 9,
+    "testName": "Clear localStorage and verify backend restoration",
+    "passed": false,
+    "timestamp": "2026-02-09T16:44:57.446Z",
+    "error": "page.waitForURL: Timeout 10000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/lobby\" until \"load\"\n============================================================"
+  },
+  {
+    "testNumber": 10,
+    "testName": "Rapid disconnect/reconnect spam (5 times)",
+    "passed": true,
+    "timestamp": "2026-02-09T16:45:15.945Z",
+    "markedBefore": 1,
+    "markedAfter": 1,
+    "reconnectCycles": 5
+  }
+]
