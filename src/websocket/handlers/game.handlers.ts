@@ -606,7 +606,6 @@ export async function handleCallNumber(
       duration_ms: duration,
       socketId: socket.id,
       timestamp: new Date().toISOString(),
-      connectedPlayers: socket.adapter.rooms.get(`game:${gameId}`)?.size || 0,
     }, `Number ${number} called successfully (${duration}ms)`);
 
     // Update PostgreSQL ASYNCHRONOUSLY (don't block)
