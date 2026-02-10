@@ -6,7 +6,10 @@
   "scripts": {
     "setup": "node setup/create-test-accounts.mjs",
     "test": "node run-all.mjs",
+    "test:all": "npx playwright test",
     "test:baseline": "npx playwright test scenarios/01-baseline-50-players.spec.ts",
+    "test:persistence": "npx playwright test scenarios/03-concurrent-hard-refresh.spec.ts",
+    "test:extreme": "npx playwright test scenarios/05-mass-leave-rejoin.spec.ts scenarios/09-early-5-race.spec.ts",
     "test:refresh": "npx playwright test scenarios/03-concurrent-hard-refresh.spec.ts",
     "test:rejoin": "npx playwright test scenarios/05-mass-leave-rejoin.spec.ts",
     "test:race": "npx playwright test scenarios/09-early-5-race.spec.ts",
