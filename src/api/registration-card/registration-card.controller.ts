@@ -52,7 +52,7 @@ export async function createRegistrationCard(
       data: {
         message,
         targetDateTime: targetDate,
-        createdBy: authReq.user.id,
+        createdBy: authReq.user.userId,
         isActive: true,
       },
     });
