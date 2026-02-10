@@ -2,8 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcrypt';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
-import { loginSchema, signupSchema, mobileVerifySchema, sendOTPSchema, verifyOTPSchema, type LoginInput, type SignupInput, type MobileVerifyInput, type SendOTPInput, type VerifyOTPInput } from './auth.schema.js';
-import { stageOTPService } from '../../services/stage-otp.service.js';
+import { loginSchema, signupSchema, mobileVerifySchema, type LoginInput, type SignupInput, type MobileVerifyInput } from './auth.schema.js';
 
 const SALT_ROUNDS = 10;
 
@@ -267,122 +266,11 @@ export async function mobileVerify(
 }
 
 /**
- * Send OTP to mobile number
- * Uses Stage's backend API (no MSG91 credentials needed)
+ * NOTE: OTP endpoints removed - Frontend calls Stage API directly
+ *
+ * Flow:
+ * 1. Frontend → Stage API: Send OTP
+ * 2. Frontend → Stage API: Verify OTP → Get Stage userId
+ * 3. Frontend → Tambola backend: validateUser(userId) → Get Tambola user
+ * 4. Frontend → Tambola WebSocket: Connect with userId
  */
-export async function sendOTP(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
-  try {
-    // Validate request body
-    const body = sendOTPSchema.parse(request.body);
-
-    console.log(`[sendOTP] Request for mobile: ${body.countryCode}${body.mobileNumber}`);
-
-    // Send OTP via Stage's API (Stage handles SMS delivery)
-    const result = await stageOTPService.sendOTP(body.mobileNumber);
-
-    if (!result.success) {
-      throw new AppError('SMS_FAILED', result.message || 'Failed to send OTP', 500);
-    }
-
-    console.log(`[sendOTP] OTP sent successfully via Stage API to: ${body.mobileNumber}`);
-
-    await reply.send({
-      success: true,
-      message: 'OTP sent successfully',
-      otpId: result.otpId, // Stage's OTP session ID
-      expiresIn: 300, // 5 minutes (Stage's default)
-    });
-  } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
-    console.error('[sendOTP] Error:', error);
-    throw new AppError('SEND_OTP_FAILED', 'Failed to send OTP', 500);
-  }
-}
-
-/**
- * Verify OTP and login/signup user
- * Uses Stage's backend to validate OTP, then creates user in Tambola DB
- */
-export async function verifyOTP(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
-  try {
-    // Validate request body
-    const body = verifyOTPSchema.parse(request.body);
-
-    console.log(`[verifyOTP] Verification request for: ${body.mobileNumber}`);
-
-    // Verify OTP via Stage's API (Stage validates it)
-    const result = await stageOTPService.verifyOTP(
-      body.otpId,
-      body.mobileNumber,
-      body.otp
-    );
-
-    if (!result.success) {
-      console.warn(`[verifyOTP] OTP verification failed for: ${body.mobileNumber}`);
-      throw new AppError('INVALID_OTP', result.message || 'Invalid or expired OTP', 400);
-    }
-
-    console.log(`[verifyOTP] OTP verified successfully via Stage API for: ${body.mobileNumber}`);
-
-    // Find or create user in Tambola's database
-    let user = await prisma.user.findUnique({
-      where: { mobileNumber: body.mobileNumber },
-    });
-
-    const isNewUser = !user;
-
-    if (!user) {
-      console.log(`[verifyOTP] Creating new Tambola user for: ${body.mobileNumber}`);
-
-      // Auto-create user with mobile number
-      user = await prisma.user.create({
-        data: {
-          mobileNumber: body.mobileNumber,
-          countryCode: '+91',
-          email: null, // No email for OTP-only users
-          password: null, // No password for OTP-only users
-          name: null, // Will be set later in lobby
-          role: 'PLAYER',
-        },
-      });
-
-      console.log(`[verifyOTP] New Tambola user created with ID: ${user.id}`);
-    } else {
-      console.log(`[verifyOTP] Existing Tambola user found with ID: ${user.id}`);
-    }
-
-    // Generate Tambola's JWT token (not Stage's token)
-    const token = request.server.jwt.sign({
-      userId: user.id,
-      mobileNumber: user.mobileNumber,
-      role: user.role,
-    });
-
-    console.log(`[verifyOTP] Login successful for: ${body.mobileNumber}`);
-
-    await reply.send({
-      success: true,
-      isNewUser,
-      userId: user.id,
-      userName: user.name,
-      mobileNumber: user.mobileNumber,
-      accessToken: token,
-    });
-  } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
-    console.error('[verifyOTP] Error:', error);
-    throw new AppError('VERIFY_OTP_FAILED', 'Failed to verify OTP', 500);
-  }
-}
