@@ -41,15 +41,18 @@ enum UserRole {
 
 // Models
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      UserRole @default(PLAYER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  email        String?  @unique // Made optional for mobile-only users
+  password     String?          // Made optional for OTP-only users
+  name         String?          // Made optional
+  role         UserRole @default(PLAYER)
+  mobileNumber String?  @unique // For OTP-based login
+  countryCode  String?  @default("+91")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([email])
+  @@index([mobileNumber])
 }
 
 model Game {
