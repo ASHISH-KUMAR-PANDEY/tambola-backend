@@ -167,3 +167,15 @@ model YouTubeLiveStream {
 
   @@index([isActive])
 }
+
+model RegistrationCard {
+  id             String   @id @default(uuid())
+  message        String
+  targetDateTime DateTime
+  isActive       Boolean  @default(true)
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isActive])
+}
