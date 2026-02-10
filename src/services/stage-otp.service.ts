@@ -79,7 +79,7 @@ class StageOTPService {
         } as StageGetOTPRequest),
       });
 
-      const data: StageGetOTPResponse = await response.json();
+      const data = await response.json() as StageGetOTPResponse;
 
       if (data.responseCode === 200 && data.data?.id) {
         console.log(`[StageOTP] OTP sent successfully to ${mobileNumber} via Stage API`);
@@ -128,7 +128,7 @@ class StageOTPService {
         } as StageVerifyOTPRequest),
       });
 
-      const data: StageVerifyOTPResponse = await response.json();
+      const data = await response.json() as StageVerifyOTPResponse;
 
       if (data.responseCode === 200 && data.data?.UserDetail) {
         console.log(`[StageOTP] OTP verified successfully for ${mobileNumber} via Stage API`);

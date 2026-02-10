@@ -68,7 +68,7 @@ class SMSService {
         }),
       });
 
-      const data: MSG91Response = await response.json();
+      const data = await response.json() as MSG91Response;
 
       if (response.ok && data.type === 'success') {
         console.log(`✅ OTP sent successfully to ${fullNumber}`);

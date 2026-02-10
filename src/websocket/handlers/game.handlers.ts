@@ -234,7 +234,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         if (user) {
           console.log('[handleGameJoin] User.name:', user.name);
           console.log('[handleGameJoin] User.email:', user.email);
-          userName = user.name || user.email;
+          userName = user.name || user.email || userName;
           console.log('[handleGameJoin] ✓ Using database userName:', userName);
         } else {
           console.log('[handleGameJoin] ✓ No user record, using fallback:', userName);

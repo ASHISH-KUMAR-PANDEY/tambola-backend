@@ -81,6 +81,11 @@ export async function login(
       throw new AppError('INVALID_CREDENTIALS', 'Invalid email or password', 401);
     }
 
+    // Check if user has password (OTP users don't have passwords)
+    if (!user.password) {
+      throw new AppError('INVALID_CREDENTIALS', 'This account uses OTP login. Please use mobile number login.', 401);
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(body.password, user.password);
 
