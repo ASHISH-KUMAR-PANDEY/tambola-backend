@@ -23,7 +23,7 @@ export const sendOTPSchema = z.object({
 
 export const verifyOTPSchema = z.object({
   mobileNumber: z.string().regex(/^\d{10}$/, 'Mobile number must be exactly 10 digits'),
-  otp: z.string().regex(/^\d{6}$/, 'OTP must be exactly 6 digits'),
+  otp: z.string().regex(/^\d{4}$/, 'OTP must be exactly 4 digits'),
   otpId: z.string().min(1, 'OTP ID is required'),
 });
 

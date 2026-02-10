@@ -3,8 +3,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import { loginSchema, signupSchema, mobileVerifySchema, sendOTPSchema, verifyOTPSchema, type LoginInput, type SignupInput, type MobileVerifyInput, type SendOTPInput, type VerifyOTPInput } from './auth.schema.js';
-import { redisService } from '../../services/redis.service.js';
-import { smsService } from '../../services/sms.service.js';
+import { stageOTPService } from '../../services/stage-otp.service.js';
 
 const SALT_ROUNDS = 10;
 
@@ -264,7 +263,7 @@ export async function mobileVerify(
 
 /**
  * Send OTP to mobile number
- * Rate limited to 3 attempts per hour
+ * Uses Stage's backend API (no MSG91 credentials needed)
  */
 export async function sendOTP(
   request: FastifyRequest,
@@ -276,49 +275,20 @@ export async function sendOTP(
 
     console.log(`[sendOTP] Request for mobile: ${body.countryCode}${body.mobileNumber}`);
 
-    // Check rate limiting
-    const rateLimit = await redisService.checkRateLimit(
-      body.mobileNumber,
-      3, // Max 3 attempts
-      3600 // Per hour
-    );
+    // Send OTP via Stage's API (Stage handles SMS delivery)
+    const result = await stageOTPService.sendOTP(body.mobileNumber);
 
-    if (!rateLimit.allowed) {
-      console.warn(`[sendOTP] Rate limit exceeded for: ${body.mobileNumber}`);
-      throw new AppError(
-        'RATE_LIMIT_EXCEEDED',
-        'Too many OTP requests. Please try again in 1 hour.',
-        429
-      );
+    if (!result.success) {
+      throw new AppError('SMS_FAILED', result.message || 'Failed to send OTP', 500);
     }
 
-    // Generate OTP and OTP ID
-    const otp = smsService.generateOTP();
-    const otpId = `otp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const expiresIn = 300; // 5 minutes
-
-    // Store OTP in Redis
-    await redisService.storeOTP(otpId, otp, expiresIn);
-
-    // Send OTP via SMS
-    const smsSent = await smsService.sendOTP({
-      mobileNumber: body.mobileNumber,
-      countryCode: body.countryCode,
-      otp,
-    });
-
-    if (!smsSent) {
-      throw new AppError('SMS_FAILED', 'Failed to send OTP. Please try again.', 500);
-    }
-
-    console.log(`[sendOTP] OTP sent successfully to: ${body.mobileNumber}`);
+    console.log(`[sendOTP] OTP sent successfully via Stage API to: ${body.mobileNumber}`);
 
     await reply.send({
       success: true,
       message: 'OTP sent successfully',
-      otpId,
-      expiresIn,
-      attemptsRemaining: rateLimit.attemptsRemaining - 1,
+      otpId: result.otpId, // Stage's OTP session ID
+      expiresIn: 300, // 5 minutes (Stage's default)
     });
   } catch (error) {
     if (error instanceof AppError) {
@@ -332,7 +302,7 @@ export async function sendOTP(
 
 /**
  * Verify OTP and login/signup user
- * Auto-creates user if mobile number doesn't exist
+ * Uses Stage's backend to validate OTP, then creates user in Tambola DB
  */
 export async function verifyOTP(
   request: FastifyRequest,
@@ -344,24 +314,21 @@ export async function verifyOTP(
 
     console.log(`[verifyOTP] Verification request for: ${body.mobileNumber}`);
 
-    // Get OTP from Redis
-    const storedOTP = await redisService.getOTP(body.otpId);
+    // Verify OTP via Stage's API (Stage validates it)
+    const result = await stageOTPService.verifyOTP(
+      body.otpId,
+      body.mobileNumber,
+      body.otp
+    );
 
-    if (!storedOTP) {
-      console.warn(`[verifyOTP] OTP not found or expired for: ${body.otpId}`);
-      throw new AppError('INVALID_OTP', 'Invalid or expired OTP', 400);
+    if (!result.success) {
+      console.warn(`[verifyOTP] OTP verification failed for: ${body.mobileNumber}`);
+      throw new AppError('INVALID_OTP', result.message || 'Invalid or expired OTP', 400);
     }
 
-    // Verify OTP
-    if (storedOTP !== body.otp) {
-      console.warn(`[verifyOTP] OTP mismatch for: ${body.mobileNumber}`);
-      throw new AppError('INVALID_OTP', 'Invalid OTP', 400);
-    }
+    console.log(`[verifyOTP] OTP verified successfully via Stage API for: ${body.mobileNumber}`);
 
-    // Delete OTP after successful verification
-    await redisService.deleteOTP(body.otpId);
-
-    // Find or create user
+    // Find or create user in Tambola's database
     let user = await prisma.user.findUnique({
       where: { mobileNumber: body.mobileNumber },
     });
@@ -369,7 +336,7 @@ export async function verifyOTP(
     const isNewUser = !user;
 
     if (!user) {
-      console.log(`[verifyOTP] Creating new user for: ${body.mobileNumber}`);
+      console.log(`[verifyOTP] Creating new Tambola user for: ${body.mobileNumber}`);
 
       // Auto-create user with mobile number
       user = await prisma.user.create({
@@ -383,12 +350,12 @@ export async function verifyOTP(
         },
       });
 
-      console.log(`[verifyOTP] New user created with ID: ${user.id}`);
+      console.log(`[verifyOTP] New Tambola user created with ID: ${user.id}`);
     } else {
-      console.log(`[verifyOTP] Existing user found with ID: ${user.id}`);
+      console.log(`[verifyOTP] Existing Tambola user found with ID: ${user.id}`);
     }
 
-    // Generate JWT token
+    // Generate Tambola's JWT token (not Stage's token)
     const token = request.server.jwt.sign({
       userId: user.id,
       mobileNumber: user.mobileNumber,
