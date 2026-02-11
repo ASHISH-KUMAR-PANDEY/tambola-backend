@@ -339,8 +339,23 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       },
     });
 
+    logger.info({
+      gameId,
+      userId,
+      gameStatus: game.status,
+      playerRecordExists: !!existingPlayer,
+      socketId: socket.id,
+    }, 'Player attempting to join game');
+
     // If game is not in LOBBY, only allow if player already joined (rejoining)
     if (game.status !== GameStatus.LOBBY && !existingPlayer) {
+      logger.warn({
+        gameId,
+        userId,
+        gameStatus: game.status,
+        socketId: socket.id,
+      }, 'Player rejected - game already started and no player record found');
+
       socket.emit('error', {
         code: 'GAME_ALREADY_STARTED',
         message: 'Cannot join game that has already started',
@@ -656,24 +671,36 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
     }
 
     // Generate tickets for all lobby players and create Player records
-    const playerPromises = lobbyPlayers.map(async (lobbyPlayer) => {
-      const ticket = generateTicket();
-      return prisma.player.create({
-        data: {
-          gameId,
-          userId: lobbyPlayer.userId,
-          userName: lobbyPlayer.userName,
-          ticket,
-        },
+    // Use a transaction to ensure all Player records are created atomically
+    // This prevents race condition where players try to join before their record exists
+    const createdPlayers = await prisma.$transaction(async (tx) => {
+      const players = await Promise.all(
+        lobbyPlayers.map(async (lobbyPlayer) => {
+          const ticket = generateTicket();
+          return tx.player.create({
+            data: {
+              gameId,
+              userId: lobbyPlayer.userId,
+              userName: lobbyPlayer.userName,
+              ticket,
+            },
+          });
+        })
+      );
+
+      // Clear lobby players within the same transaction
+      await tx.gameLobbyPlayer.deleteMany({
+        where: { gameId },
       });
+
+      return players;
     });
 
-    const createdPlayers = await Promise.all(playerPromises);
-
-    // Clear lobby players
-    await prisma.gameLobbyPlayer.deleteMany({
-      where: { gameId },
-    });
+    logger.info({
+      gameId,
+      playerCount: createdPlayers.length,
+      userIds: createdPlayers.map(p => p.userId),
+    }, 'All Player records created successfully in transaction');
 
     // Initialize game state in Redis
     await gameService.initializeGameState(gameId);
