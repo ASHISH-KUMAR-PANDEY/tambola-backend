@@ -27,8 +27,13 @@ export const verifyOTPSchema = z.object({
   otpId: z.string().min(1, 'OTP ID is required'),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty').max(100, 'Name is too long'),
+});
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type MobileVerifyInput = z.infer<typeof mobileVerifySchema>;
 export type SendOTPInput = z.infer<typeof sendOTPSchema>;
 export type VerifyOTPInput = z.infer<typeof verifyOTPSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

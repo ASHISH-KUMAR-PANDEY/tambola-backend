@@ -12,6 +12,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/send-otp', authController.sendOTP);
   fastify.post('/verify-otp', authController.verifyOTP);
 
-  // Protected route
+  // Protected routes
   fastify.get('/me', authController.me);
+  fastify.patch('/update-profile', authController.updateUserProfile);
 }

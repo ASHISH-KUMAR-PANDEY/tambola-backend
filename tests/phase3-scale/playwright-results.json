@@ -67,21 +67,21 @@
   },
   "suites": [
     {
-      "title": "05-mass-leave-rejoin.spec.ts",
-      "file": "05-mass-leave-rejoin.spec.ts",
+      "title": "09-early-5-race.spec.ts",
+      "file": "09-early-5-race.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "Leave/Rejoin: Mass Leave and Rejoin",
-          "file": "05-mass-leave-rejoin.spec.ts",
+          "title": "Win Race: Early 5 Simultaneous Claims",
+          "file": "09-early-5-race.spec.ts",
           "line": 26,
           "column": 6,
           "specs": [
             {
-              "title": "20 players leave and rejoin during active game",
-              "ok": false,
+              "title": "5 players claim Early 5 simultaneously",
+              "ok": true,
               "tags": [],
               "tests": [
                 {
@@ -94,28 +94,9 @@
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 56131,
-                      "error": {
-                        "message": "Error: Call number 77 timeout",
-                        "stack": "Error: Call number 77 timeout\n    at Timeout._onTimeout (/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts:198:18)",
-                        "location": {
-                          "file": "/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts",
-                          "column": 18,
-                          "line": 198
-                        },
-                        "snippet": "\u001b[90m   at \u001b[39m../helpers/organizer.ts:198\n\n  196 |           resolved = true;\n  197 |           this.socket!.removeListener('game:numberCalled', handler);\n> 198 |           reject(new Error(`Call number ${number} timeout`));\n      |                  ^\n  199 |         }\n  200 |       }, 5000);\n  201 |     });"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts",
-                            "column": 18,
-                            "line": 198
-                          },
-                          "message": "Error: Call number 77 timeout\n\n   at ../helpers/organizer.ts:198\n\n  196 |           resolved = true;\n  197 |           this.socket!.removeListener('game:numberCalled', handler);\n> 198 |           reject(new Error(`Call number ${number} timeout`));\n      |                  ^\n  199 |         }\n  200 |       }, 5000);\n  201 |     });\n    at Timeout._onTimeout (/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts:198:18)"
-                        }
-                      ],
+                      "status": "passed",
+                      "duration": 106237,
+                      "errors": [],
                       "stdout": [
                         {
                           "text": "\n✅ Loaded test accounts\n"
@@ -124,7 +105,7 @@
                           "text": "\n╔════════════════════════════════════════════════════════════╗\n"
                         },
                         {
-                          "text": "║   TEST 5: MASS LEAVE/REJOIN (20 OF 50 PLAYERS)            ║\n"
+                          "text": "║   TEST 9: EARLY 5 RACE CONDITION (5 PLAYERS)              ║\n"
                         },
                         {
                           "text": "╚════════════════════════════════════════════════════════════╝\n\n"
@@ -133,7 +114,7 @@
                           "text": "Step 1: Setting up organizer...\n"
                         },
                         {
-                          "text": "✅ Organizer ready, game: 1b8d5413-7cfc-4afc-b9db-903c6b364946\n\n"
+                          "text": "✅ Organizer ready, game: 21b9c980-e0a3-40a4-a927-3a82dfd48fc4\n\n"
                         },
                         {
                           "text": "Step 2: Connecting 50 socket players...\n"
@@ -163,74 +144,159 @@
                           "text": "✅ All 50 players joined\n\n"
                         },
                         {
-                          "text": "Step 4: Enabling auto-mark...\n"
-                        },
-                        {
-                          "text": "✅ Auto-mark enabled\n\n"
-                        },
-                        {
-                          "text": "Step 5: Starting game...\n"
+                          "text": "Step 4: Starting game...\n"
                         },
                         {
                           "text": "✅ Game started\n\n"
                         },
                         {
-                          "text": "Step 6: Calling 30 numbers...\n"
+                          "text": "Step 5: Setting up 5 players for Early 5 race...\n"
                         },
                         {
-                          "text": "✅ Called 30 numbers\n\n"
+                          "text": "  Player 1 (TestPlayer01): Will mark 18, 41, 52, 72, 83\n"
                         },
                         {
-                          "text": "Step 7: Recording state before leaving...\n"
+                          "text": "  Player 2 (TestPlayer02): Will mark 13, 20, 57, 61, 84\n"
                         },
                         {
-                          "text": "  State of first 3 leaving players:\n"
+                          "text": "  Player 3 (TestPlayer03): Will mark 16, 31, 42, 53, 76\n"
                         },
                         {
-                          "text": "    TestPlayer01: marked=5, called=30\n"
+                          "text": "  Player 4 (TestPlayer04): Will mark 1, 30, 57, 64, 83\n"
                         },
                         {
-                          "text": "    TestPlayer02: marked=6, called=30\n"
+                          "text": "  Player 5 (TestPlayer05): Will mark 16, 36, 41, 63, 71\n"
                         },
                         {
-                          "text": "    TestPlayer03: marked=4, called=30\n"
+                          "text": "  Calling 21 unique numbers...\n"
                         },
                         {
-                          "text": "✅ State recorded\n\n"
+                          "text": "✅ Numbers called\n\n"
                         },
                         {
-                          "text": "Step 8: 20 players leaving game...\n"
+                          "text": "Step 6: Race players marking their 5 numbers...\n"
                         },
                         {
-                          "text": "✅ 20 players left\n\n"
+                          "text": "  TestPlayer01 marked 5 numbers\n"
                         },
                         {
-                          "text": "Step 9: Continuing game (calling 10 more numbers)...\n"
+                          "text": "  TestPlayer02 marked 5 numbers\n"
+                        },
+                        {
+                          "text": "  TestPlayer03 marked 5 numbers\n"
+                        },
+                        {
+                          "text": "  TestPlayer04 marked 5 numbers\n"
+                        },
+                        {
+                          "text": "  TestPlayer05 marked 5 numbers\n"
+                        },
+                        {
+                          "text": "✅ All race players have marked 5 numbers\n\n"
+                        },
+                        {
+                          "text": "Step 7: 5 players claiming Early 5 simultaneously...\n"
+                        },
+                        {
+                          "text": "\n  Claim results:\n"
+                        },
+                        {
+                          "text": "    Player 1: ❌ REJECTED - Claim timeout\n"
+                        },
+                        {
+                          "text": "    Player 2: ✅ ACCEPTED - Congratulations! You won EARLY 5!\n"
+                        },
+                        {
+                          "text": "    Player 3: ❌ REJECTED - Claim timeout\n"
+                        },
+                        {
+                          "text": "    Player 4: ❌ REJECTED - Claim timeout\n"
+                        },
+                        {
+                          "text": "    Player 5: ❌ REJECTED - Claim timeout\n"
+                        },
+                        {
+                          "text": "\nValidating: Exactly 1 claim accepted...\n"
+                        },
+                        {
+                          "text": "✅ Exactly 1 claim accepted\n\n"
+                        },
+                        {
+                          "text": "✅ 4 claims rejected as expected\n\n"
+                        },
+                        {
+                          "text": "Step 9: Waiting for winner broadcast...\n"
+                        },
+                        {
+                          "text": "Validating: All players see 1 Early 5 winner...\n"
+                        },
+                        {
+                          "text": "✅ All 50 players see exactly 1 Early 5 winner\n\n"
+                        },
+                        {
+                          "text": "✅ Winner is one of the race players: TestPlayer02\n\n"
+                        },
+                        {
+                          "text": "Validating: No duplicate Early 5 winners...\n"
+                        },
+                        {
+                          "text": "✅ No duplicate winners\n\n"
+                        },
+                        {
+                          "text": "Step 12: Continuing game (calling 10 more numbers)...\n"
+                        },
+                        {
+                          "text": "✅ Game continues normally\n\n"
+                        },
+                        {
+                          "text": "╔════════════════════════════════════════════════════════════╗\n"
+                        },
+                        {
+                          "text": "║                    TEST COMPLETE                           ║\n"
+                        },
+                        {
+                          "text": "╚════════════════════════════════════════════════════════════╝\n\n"
+                        },
+                        {
+                          "text": "  Race players: 5\n"
+                        },
+                        {
+                          "text": "  Claims accepted: 1\n"
+                        },
+                        {
+                          "text": "  Claims rejected: 4\n"
+                        },
+                        {
+                          "text": "  Winner broadcast: ✅ (all 50 players notified)\n"
+                        },
+                        {
+                          "text": "  No duplicate winners: ✅\n"
+                        },
+                        {
+                          "text": "  Game continues: ✅\n"
+                        },
+                        {
+                          "text": "  Status: ✅ PASSED\n\n"
+                        },
+                        {
+                          "text": "Cleaning up...\n"
+                        },
+                        {
+                          "text": "✅ Cleanup complete\n\n"
                         }
                       ],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-02-09T21:41:38.031Z",
+                      "startTime": "2026-02-10T06:20:19.841Z",
                       "annotations": [],
-                      "attachments": [
-                        {
-                          "name": "trace",
-                          "contentType": "application/zip",
-                          "path": "/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/test-results/05-mass-leave-rejoin-Leave-552c8-d-rejoin-during-active-game-chromium/trace.zip"
-                        }
-                      ],
-                      "errorLocation": {
-                        "file": "/Users/stageadmin/tambola-game/tambola-backend/tests/phase3-scale/helpers/organizer.ts",
-                        "column": 18,
-                        "line": 198
-                      }
+                      "attachments": []
                     }
                   ],
-                  "status": "unexpected"
+                  "status": "expected"
                 }
               ],
-              "id": "45f0a7c0968435694ceb-fae34b4a7c3290fb48b3",
-              "file": "05-mass-leave-rejoin.spec.ts",
+              "id": "cf66b5f8c0ec643e014f-ffa883250a720c7fe15e",
+              "file": "09-early-5-race.spec.ts",
               "line": 43,
               "column": 3
             }
@@ -241,11 +307,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-02-09T21:41:37.436Z",
-    "duration": 56800.421,
-    "expected": 0,
+    "startTime": "2026-02-10T06:20:19.263Z",
+    "duration": 106880.69,
+    "expected": 1,
     "skipped": 0,
-    "unexpected": 1,
+    "unexpected": 0,
     "flaky": 0
   }
 }

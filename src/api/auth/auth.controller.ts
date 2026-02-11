@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import bcrypt from 'bcrypt';
 import { prisma } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
-import { loginSchema, signupSchema, mobileVerifySchema, sendOTPSchema, verifyOTPSchema, type LoginInput, type SignupInput, type MobileVerifyInput, type SendOTPInput, type VerifyOTPInput } from './auth.schema.js';
+import { loginSchema, signupSchema, mobileVerifySchema, sendOTPSchema, verifyOTPSchema, updateProfileSchema, type LoginInput, type SignupInput, type MobileVerifyInput, type SendOTPInput, type VerifyOTPInput, type UpdateProfileInput } from './auth.schema.js';
 import { stageOTPService } from '../../services/stage-otp.service.js';
 
 const SALT_ROUNDS = 10;
@@ -384,5 +384,61 @@ export async function verifyOTP(
 
     console.error('[verifyOTP] Error:', error);
     throw new AppError('VERIFY_OTP_FAILED', 'Failed to verify OTP', 500);
+  }
+}
+
+/**
+ * Update user profile (name)
+ */
+export async function updateUserProfile(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    // Get user ID from JWT token
+    const userId = (request.user as any)?.userId;
+    if (!userId) {
+      throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
+    }
+
+    // Validate request body
+    const body = updateProfileSchema.parse(request.body);
+
+    console.log(`[updateUserProfile] Updating profile for user: ${userId}`);
+    console.log(`[updateUserProfile] New name: ${body.name}`);
+
+    // Update user in database
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { name: body.name },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        mobileNumber: true,
+        role: true,
+      },
+    });
+
+    console.log(`[updateUserProfile] Profile updated successfully for user: ${userId}`);
+
+    await reply.send({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        mobileNumber: user.mobileNumber,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    console.error('[updateUserProfile] Error:', error);
+    throw new AppError('UPDATE_PROFILE_FAILED', 'Failed to update profile', 500);
   }
 }
