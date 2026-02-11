@@ -282,47 +282,59 @@ io.on('connection', (socket) => {
   socket.on('disconnect', async (reason) => {
     const userId = socket.data.userId as string;
 
+    logger.info({ userId, socketId: socket.id, reason }, 'Socket disconnecting');
+
     // Remove player from any waiting lobbies they're in
+    // Query database instead of relying on socket.rooms since rooms might be cleared
     if (userId) {
-      const rooms = Array.from(socket.rooms);
-      const lobbyRooms = rooms.filter(room => room.startsWith('lobby:'));
+      try {
+        // Find all lobbies this user is in
+        const userLobbies = await prisma.gameLobbyPlayer.findMany({
+          where: { userId },
+          select: { gameId: true, userName: true },
+        });
 
-      for (const lobbyRoom of lobbyRooms) {
-        const gameId = lobbyRoom.replace('lobby:', '');
-        try {
-          // Remove from lobby
-          await prisma.gameLobbyPlayer.delete({
-            where: {
-              gameId_userId: {
-                gameId,
-                userId,
+        logger.info({ userId, lobbiesCount: userLobbies.length }, 'User in lobbies');
+
+        for (const lobby of userLobbies) {
+          const { gameId, userName } = lobby;
+
+          try {
+            // Remove from lobby
+            await prisma.gameLobbyPlayer.delete({
+              where: {
+                gameId_userId: {
+                  gameId,
+                  userId,
+                },
               },
-            },
-          }).catch(() => {
-            // Player might not be in lobby, ignore error
-          });
+            });
 
-          // Get remaining players
-          const remainingPlayers = await prisma.gameLobbyPlayer.findMany({
-            where: { gameId },
-            select: { userId: true, userName: true },
-          });
+            // Get remaining players
+            const remainingPlayers = await prisma.gameLobbyPlayer.findMany({
+              where: { gameId },
+              select: { userId: true, userName: true },
+            });
 
-          // Notify remaining players
-          io.in(lobbyRoom).emit('lobby:playerLeft', {
-            gameId,
-            userId,
-            playerCount: remainingPlayers.length,
-            players: remainingPlayers.map((p: any) => ({
-              userId: p.userId,
-              userName: p.userName,
-            })),
-          });
+            // Notify remaining players in the lobby room
+            io.in(`lobby:${gameId}`).emit('lobby:playerLeft', {
+              gameId,
+              userId,
+              userName,
+              playerCount: remainingPlayers.length,
+              players: remainingPlayers.map((p: any) => ({
+                userId: p.userId,
+                userName: p.userName,
+              })),
+            });
 
-          logger.info({ gameId, userId, reason }, 'Player removed from waiting lobby on disconnect');
-        } catch (error) {
-          logger.error({ error, gameId, userId }, 'Error removing player from lobby on disconnect');
+            logger.info({ gameId, userId, userName, remainingCount: remainingPlayers.length, reason }, 'Player removed from waiting lobby on disconnect');
+          } catch (error) {
+            logger.error({ error, gameId, userId }, 'Error removing player from lobby on disconnect');
+          }
         }
+      } catch (error) {
+        logger.error({ error, userId }, 'Error finding user lobbies on disconnect');
       }
     }
 
