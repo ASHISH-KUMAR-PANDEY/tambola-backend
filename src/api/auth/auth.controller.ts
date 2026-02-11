@@ -436,28 +436,51 @@ export async function verifyOTP(
 
 /**
  * Update user profile (name)
+ * Supports both JWT-authenticated users and mobile app users (with userId in body)
  */
 export async function updateUserProfile(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
   try {
-    // Get user ID from JWT token
-    const userId = (request.user as any)?.userId;
-    if (!userId) {
-      throw new AppError('UNAUTHORIZED', 'Authentication required', 401);
+    // Get user ID from JWT token (for regular users) or body (for mobile app users)
+    let userId = (request.user as any)?.userId;
+    const body = request.body as any;
+
+    // If no JWT token, check body for userId (mobile app users)
+    if (!userId && body.userId) {
+      userId = body.userId;
+      console.log(`[updateUserProfile] Using userId from body (mobile app user): ${userId}`);
     }
 
-    // Validate request body
-    const body = updateProfileSchema.parse(request.body);
+    if (!userId) {
+      throw new AppError('UNAUTHORIZED', 'Authentication required - userId not found', 401);
+    }
+
+    // Validate name
+    if (!body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {
+      throw new AppError('INVALID_REQUEST', 'Name is required', 400);
+    }
+
+    const name = body.name.trim();
 
     console.log(`[updateUserProfile] Updating profile for user: ${userId}`);
-    console.log(`[updateUserProfile] New name: ${body.name}`);
+    console.log(`[updateUserProfile] New name: ${name}`);
 
-    // Update user in database
-    const user = await prisma.user.update({
+    // Upsert user in database (create if doesn't exist, update if exists)
+    const user = await prisma.user.upsert({
       where: { id: userId },
-      data: { name: body.name },
+      update: {
+        name: name,
+      },
+      create: {
+        id: userId,
+        email: `user_${userId}@app.com`,
+        name: name,
+        role: 'PLAYER',
+        password: null,
+        mobileNumber: null,
+      },
       select: {
         id: true,
         email: true,
