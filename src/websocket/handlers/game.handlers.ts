@@ -389,10 +389,16 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         };
       });
 
+      // Get this player's wins for immediate feedback
+      const playerWins = winnersData
+        .filter(w => w.playerId === existingPlayer.id)
+        .map(w => w.category);
+
       socket.emit('game:joined', {
         gameId,
         playerId: existingPlayer.id,
         ticket: existingPlayer.ticket,
+        wins: playerWins, // Include player's wins for immediate sync
       });
 
       // Fetch markedNumbers from Redis for the rejoining player
@@ -1057,11 +1063,25 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
         // User might not exist (mobile app users), use default
       }
 
-      // Broadcast to winner
-      socket.emit('game:winClaimed', {
+      // Broadcast to winner with acknowledgment for reliable delivery
+      socket.timeout(5000).emit('game:winClaimed', {
         category,
         success: true,
         message: `Congratulations! You won ${category.split('_').join(' ')}!`,
+      }, (err: Error | null) => {
+        if (err) {
+          // Event delivery failed or timed out
+          enhancedLogger.error(
+            { gameId, userId, playerId: player.id, category, error: err.message },
+            'Failed to deliver game:winClaimed event to winner - event may not have reached frontend'
+          );
+        } else {
+          // Event successfully acknowledged by frontend
+          enhancedLogger.info(
+            { gameId, userId, playerId: player.id, category },
+            'game:winClaimed event acknowledged by winner'
+          );
+        }
       });
 
       // Broadcast to all players and organizer in the game room (except the winner)
