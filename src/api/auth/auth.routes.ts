@@ -7,6 +7,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/login', authController.login);
   fastify.post('/validate-user', authController.validateUser);
   fastify.post('/mobile-verify', authController.mobileVerify);
+  fastify.get('/profile/:userId', authController.getUserProfile);
 
   // OTP-based authentication routes
   fastify.post('/send-otp', authController.sendOTP);

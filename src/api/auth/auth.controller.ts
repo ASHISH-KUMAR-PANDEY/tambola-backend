@@ -153,6 +153,53 @@ export async function me(
   }
 }
 
+/**
+ * Get user profile by userId (public endpoint for mobile app users)
+ */
+export async function getUserProfile(
+  request: FastifyRequest<{ Params: { userId: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { userId } = request.params;
+
+    console.log(`[getUserProfile] Fetching profile for userId: ${userId}`);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, mobileNumber: true },
+    });
+
+    if (!user) {
+      console.log(`[getUserProfile] User not found: ${userId}`);
+      await reply.status(404).send({
+        success: false,
+        message: 'User not found',
+      });
+      return;
+    }
+
+    console.log(`[getUserProfile] User found: ${userId}, name: ${user.name || '(no name)'}`);
+
+    await reply.send({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        mobileNumber: user.mobileNumber,
+      },
+    });
+  } catch (error) {
+    console.error('[getUserProfile] Error:', error);
+    await reply.status(500).send({
+      success: false,
+      message: 'Failed to fetch user profile',
+    });
+  }
+}
+
 export async function validateUser(
   request: FastifyRequest,
   reply: FastifyReply
