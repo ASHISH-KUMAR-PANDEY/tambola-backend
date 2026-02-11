@@ -11,6 +11,7 @@ import { errorHandler } from './utils/error.js';
 import { connectDatabase, disconnectDatabase } from './database/client.js';
 import { redis } from './database/redis.js';
 import { getUploadsDir } from './services/localStorage.service.js';
+import { prisma } from './models/index.js';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -176,6 +177,31 @@ io.on('connection', (socket) => {
     'Client connected'
   );
 
+  // Lobby event handlers
+  socket.on('lobby:join', async (payload) => {
+    try {
+      await gameHandlers.handleLobbyJoin(socket, payload);
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'lobby:join' }, 'Event handler error');
+      socket.emit('error', {
+        code: 'HANDLER_ERROR',
+        message: 'Failed to process lobby:join event',
+      });
+    }
+  });
+
+  socket.on('lobby:leave', async (payload) => {
+    try {
+      await gameHandlers.handleLobbyLeave(socket, payload);
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'lobby:leave' }, 'Event handler error');
+      socket.emit('error', {
+        code: 'HANDLER_ERROR',
+        message: 'Failed to process lobby:leave event',
+      });
+    }
+  });
+
   // Game event handlers with try/catch wrappers per project-context.md
   socket.on('game:join', async (payload) => {
     try {
@@ -253,7 +279,53 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', (reason) => {
+  socket.on('disconnect', async (reason) => {
+    const userId = socket.data.userId as string;
+
+    // Remove player from any waiting lobbies they're in
+    if (userId) {
+      const rooms = Array.from(socket.rooms);
+      const lobbyRooms = rooms.filter(room => room.startsWith('lobby:'));
+
+      for (const lobbyRoom of lobbyRooms) {
+        const gameId = lobbyRoom.replace('lobby:', '');
+        try {
+          // Remove from lobby
+          await prisma.gameLobbyPlayer.delete({
+            where: {
+              gameId_userId: {
+                gameId,
+                userId,
+              },
+            },
+          }).catch(() => {
+            // Player might not be in lobby, ignore error
+          });
+
+          // Get remaining players
+          const remainingPlayers = await prisma.gameLobbyPlayer.findMany({
+            where: { gameId },
+            select: { userId: true, userName: true },
+          });
+
+          // Notify remaining players
+          io.in(lobbyRoom).emit('lobby:playerLeft', {
+            gameId,
+            userId,
+            playerCount: remainingPlayers.length,
+            players: remainingPlayers.map((p: any) => ({
+              userId: p.userId,
+              userName: p.userName,
+            })),
+          });
+
+          logger.info({ gameId, userId, reason }, 'Player removed from waiting lobby on disconnect');
+        } catch (error) {
+          logger.error({ error, gameId, userId }, 'Error removing player from lobby on disconnect');
+        }
+      }
+    }
+
     // Explicit room cleanup to keep Redis adapter state clean
     // While Socket.IO should auto-remove from rooms, explicit cleanup helps prevent race conditions
     const rooms = Array.from(socket.rooms);

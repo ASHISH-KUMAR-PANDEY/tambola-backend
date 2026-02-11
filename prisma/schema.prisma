@@ -56,23 +56,36 @@ model User {
 }
 
 model Game {
-  id            String      @id @default(uuid())
+  id            String             @id @default(uuid())
   scheduledTime DateTime
   startedAt     DateTime?
   endedAt       DateTime?
-  status        GameStatus  @default(LOBBY)
+  status        GameStatus         @default(LOBBY)
   createdBy     String
   prizes        Json
-  calledNumbers Int[]       @default([])
+  calledNumbers Int[]              @default([])
   currentNumber Int?
-  players       Player[]
+  lobbyPlayers  GameLobbyPlayer[]  // Players in waiting lobby
+  players       Player[]           // Players with tickets (after game starts)
   winners       Winner[]
   prizeQueue    PrizeQueue[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([scheduledTime, status])
   @@index([createdBy])
+}
+
+model GameLobbyPlayer {
+  id        String   @id @default(uuid())
+  gameId    String
+  userId    String
+  userName  String
+  joinedAt  DateTime @default(now())
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, userId])
+  @@index([gameId])
 }
 
 model Player {

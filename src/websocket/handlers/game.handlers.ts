@@ -31,6 +31,15 @@ const joinGameSchema = z.object({
   userName: z.string().optional(),
 });
 
+const lobbyJoinSchema = z.object({
+  gameId: z.string().uuid('Invalid UUID'),
+  userName: z.string().min(1, 'Username is required'),
+});
+
+const lobbyLeaveSchema = z.object({
+  gameId: z.string().uuid('Invalid UUID'),
+});
+
 const callNumberSchema = z.object({
   gameId: z.string().uuid('Invalid UUID'),
   number: z.number().int().min(1).max(90),
@@ -46,6 +55,201 @@ const markNumberSchema = z.object({
   playerId: z.string().uuid('Invalid UUID'),
   number: z.number().int().min(1).max(90),
 });
+
+/**
+ * Handle lobby join - player joins waiting lobby before game starts
+ */
+export async function handleLobbyJoin(socket: Socket, payload: unknown): Promise<void> {
+  try {
+    const { gameId, userName } = lobbyJoinSchema.parse(payload);
+    const userId = socket.data.userId as string;
+
+    logger.info({ gameId, userId, userName }, 'Player joining waiting lobby');
+
+    // Check if game exists and is in LOBBY status
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+      return;
+    }
+
+    if (game.status !== GameStatus.LOBBY) {
+      socket.emit('error', {
+        code: 'GAME_ALREADY_STARTED',
+        message: 'Cannot join lobby - game has already started',
+      });
+      return;
+    }
+
+    // Add or update player in waiting lobby
+    const lobbyPlayer = await prisma.gameLobbyPlayer.upsert({
+      where: {
+        gameId_userId: {
+          gameId,
+          userId,
+        },
+      },
+      create: {
+        gameId,
+        userId,
+        userName,
+      },
+      update: {
+        userName, // Update name if rejoining
+        joinedAt: new Date(), // Update join time
+      },
+    });
+
+    // Join socket room for lobby updates
+    socket.join(`lobby:${gameId}`);
+
+    // Get all players in lobby
+    const allLobbyPlayers = await prisma.gameLobbyPlayer.findMany({
+      where: { gameId },
+      select: { id: true, userId: true, userName: true, joinedAt: true },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    // Confirm join to player
+    socket.emit('lobby:joined', {
+      gameId,
+      playerCount: allLobbyPlayers.length,
+      players: allLobbyPlayers.map(p => ({
+        userId: p.userId,
+        userName: p.userName,
+      })),
+    });
+
+    // Broadcast to all players in lobby
+    const io = getIO();
+    io.in(`lobby:${gameId}`).emit('lobby:playerJoined', {
+      gameId,
+      userId: lobbyPlayer.userId,
+      userName: lobbyPlayer.userName,
+      playerCount: allLobbyPlayers.length,
+      players: allLobbyPlayers.map(p => ({
+        userId: p.userId,
+        userName: p.userName,
+      })),
+    });
+
+    // Also notify organizer if they're connected
+    const organizerSocketId = await redis.get(`user:${game.createdBy}:socket`);
+    if (organizerSocketId) {
+      io.to(organizerSocketId).emit('lobby:playerJoined', {
+        gameId,
+        userId: lobbyPlayer.userId,
+        userName: lobbyPlayer.userName,
+        playerCount: allLobbyPlayers.length,
+        players: allLobbyPlayers.map(p => ({
+          userId: p.userId,
+          userName: p.userName,
+        })),
+      });
+    }
+
+    logger.info({
+      gameId,
+      userId,
+      userName,
+      playerCount: allLobbyPlayers.length,
+    }, 'Player joined waiting lobby');
+  } catch (error) {
+    logger.error({ error, socketId: socket.id }, 'lobby:join handler error');
+    socket.emit('error', {
+      code: 'LOBBY_JOIN_FAILED',
+      message: 'Failed to join waiting lobby',
+    });
+  }
+}
+
+/**
+ * Handle lobby leave - player leaves waiting lobby
+ */
+export async function handleLobbyLeave(socket: Socket, payload: unknown): Promise<void> {
+  try {
+    const { gameId } = lobbyLeaveSchema.parse(payload);
+    const userId = socket.data.userId as string;
+
+    logger.info({ gameId, userId }, 'Player leaving waiting lobby');
+
+    // Check if game exists
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+    });
+
+    if (!game) {
+      socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+      return;
+    }
+
+    // Remove player from lobby
+    await prisma.gameLobbyPlayer.delete({
+      where: {
+        gameId_userId: {
+          gameId,
+          userId,
+        },
+      },
+    }).catch(() => {
+      // Player might not be in lobby, ignore error
+    });
+
+    // Leave socket room
+    socket.leave(`lobby:${gameId}`);
+
+    // Get remaining players
+    const remainingPlayers = await prisma.gameLobbyPlayer.findMany({
+      where: { gameId },
+      select: { userId: true, userName: true },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    // Confirm leave to player
+    socket.emit('lobby:left', { gameId });
+
+    // Broadcast to remaining players
+    const io = getIO();
+    io.in(`lobby:${gameId}`).emit('lobby:playerLeft', {
+      gameId,
+      userId,
+      playerCount: remainingPlayers.length,
+      players: remainingPlayers.map(p => ({
+        userId: p.userId,
+        userName: p.userName,
+      })),
+    });
+
+    // Also notify organizer
+    const organizerSocketId = await redis.get(`user:${game.createdBy}:socket`);
+    if (organizerSocketId) {
+      io.to(organizerSocketId).emit('lobby:playerLeft', {
+        gameId,
+        userId,
+        playerCount: remainingPlayers.length,
+        players: remainingPlayers.map(p => ({
+          userId: p.userId,
+          userName: p.userName,
+        })),
+      });
+    }
+
+    logger.info({
+      gameId,
+      userId,
+      playerCount: remainingPlayers.length,
+    }, 'Player left waiting lobby');
+  } catch (error) {
+    logger.error({ error, socketId: socket.id }, 'lobby:leave handler error');
+    socket.emit('error', {
+      code: 'LOBBY_LEAVE_FAILED',
+      message: 'Failed to leave waiting lobby',
+    });
+  }
+}
 
 /**
  * Handle player joining a game
@@ -437,18 +641,39 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       return;
     }
 
-    // Check minimum players
-    const playerCount = await prisma.player.count({
+    // Get all players from waiting lobby
+    const lobbyPlayers = await prisma.gameLobbyPlayer.findMany({
       where: { gameId },
+      select: { userId: true, userName: true },
     });
 
-    if (playerCount === 0) {
+    if (lobbyPlayers.length === 0) {
       socket.emit('error', {
         code: 'NO_PLAYERS',
-        message: 'Cannot start game with no players',
+        message: 'Cannot start game with no players in waiting lobby',
       });
       return;
     }
+
+    // Generate tickets for all lobby players and create Player records
+    const playerPromises = lobbyPlayers.map(async (lobbyPlayer) => {
+      const ticket = generateTicket();
+      return prisma.player.create({
+        data: {
+          gameId,
+          userId: lobbyPlayer.userId,
+          userName: lobbyPlayer.userName,
+          ticket,
+        },
+      });
+    });
+
+    const createdPlayers = await Promise.all(playerPromises);
+
+    // Clear lobby players
+    await prisma.gameLobbyPlayer.deleteMany({
+      where: { gameId },
+    });
 
     // Initialize game state in Redis
     await gameService.initializeGameState(gameId);
@@ -462,11 +687,13 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       status: GameStatus.ACTIVE,
     });
 
-    // Broadcast to all players in room
+    // Broadcast to all players in lobby room
     const io = getIO();
-    io.in(`game:${gameId}`).emit('game:started', { gameId });
-    // Direct emit to organizer (not in room to avoid Redis adapter race)
-    socket.emit('game:started', { gameId });
+    io.in(`lobby:${gameId}`).emit('game:starting', { gameId });
+    // Also broadcast to game room (in case anyone is already there)
+    io.in(`game:${gameId}`).emit('game:starting', { gameId });
+    // Direct emit to organizer
+    socket.emit('game:starting', { gameId });
 
     // Enhanced logging for organizer actions
     logger.info({
@@ -474,11 +701,11 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       action: 'GAME_STARTED',
       gameId,
       organizerId: userId,
-      playerCount: playerCount,
+      playerCount: createdPlayers.length,
       socketId: socket.id,
       timestamp: new Date().toISOString(),
       scheduledTime: game.scheduledTime,
-    }, `Game started with ${playerCount} players`);
+    }, `Game started with ${createdPlayers.length} players from waiting lobby`);
   } catch (error) {
     logger.error({ error, socketId: socket.id }, 'game:start handler error');
     socket.emit('error', {
