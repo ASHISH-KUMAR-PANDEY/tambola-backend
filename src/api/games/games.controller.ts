@@ -54,8 +54,18 @@ export async function listGames(
 
     // Check if user is authenticated
     const authReq = request as any;
-    const userId = authReq.user?.userId;
-    let userRole = authReq.user?.role;
+    const query = request.query as { status?: string; userId?: string };
+    let userId: string | undefined;
+    let userRole: 'PLAYER' | 'ORGANIZER' | undefined;
+
+    // Try to get userId from JWT token first (authenticated users)
+    userId = authReq.user?.userId;
+    userRole = authReq.user?.role;
+
+    // Fall back to query param (mobile app users without JWT)
+    if (!userId) {
+      userId = query.userId;
+    }
 
     if (!userId) {
       // No authentication - return VIP-only message
@@ -90,9 +100,7 @@ export async function listGames(
       }
     }
 
-    const { status } = request.query as { status?: string };
-
-    const where = status ? { status: status as any } : {};
+    const where = query.status ? { status: query.status as any } : {};
     const games = await prisma.game.findMany({
       where,
       select: {
