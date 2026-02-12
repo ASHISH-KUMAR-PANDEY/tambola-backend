@@ -49,57 +49,9 @@ export async function listGames(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    // Import isUserVIP dynamically to avoid circular dependencies
-    const { isUserVIP } = await import('../vip-cohort/vip-cohort.controller.js');
-
-    // Check if user is authenticated
-    const authReq = request as any;
+    // NOTE: VIP check has been moved to game join (WebSocket handler)
+    // Everyone can see games, but only VIP users can join them
     const query = request.query as { status?: string; userId?: string };
-    let userId: string | undefined;
-    let userRole: 'PLAYER' | 'ORGANIZER' | undefined;
-
-    // Try to get userId from JWT token first (authenticated users)
-    userId = authReq.user?.userId;
-    userRole = authReq.user?.role;
-
-    // Fall back to query param (mobile app users without JWT)
-    if (!userId) {
-      userId = query.userId;
-    }
-
-    if (!userId) {
-      // No authentication - return VIP-only message
-      throw new AppError(
-        'VIP_ONLY',
-        'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
-        403
-      );
-    }
-
-    // If role not in JWT (older tokens), query from database
-    if (!userRole) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true },
-      });
-      userRole = user?.role;
-    }
-
-    // Organizers have full access - bypass VIP check
-    if (userRole !== 'ORGANIZER') {
-      // For regular players, check VIP status
-      const isVIP = await isUserVIP(userId);
-
-      if (!isVIP) {
-        // User not VIP - return VIP-only message
-        throw new AppError(
-          'VIP_ONLY',
-          'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
-          403
-        );
-      }
-    }
-
     const where = query.status ? { status: query.status as any } : {};
     const games = await prisma.game.findMany({
       where,
