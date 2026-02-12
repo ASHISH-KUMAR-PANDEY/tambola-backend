@@ -84,9 +84,17 @@ export async function handleLobbyJoin(socket: Socket, payload: unknown): Promise
       return;
     }
 
-    // VIP access control: Check if user is VIP or game organizer
-    // Organizers can always join their own game lobbies
-    if (game.createdBy !== userId) {
+    // VIP access control: Check if user is VIP, game organizer, or has ORGANIZER role
+    // First check if user is the game creator or has ORGANIZER role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isOrganizer = user?.role === 'ORGANIZER' || game.createdBy === userId;
+
+    if (!isOrganizer) {
+      // For regular players, check VIP status
       const { isUserVIP } = await import('../../api/vip-cohort/vip-cohort.controller.js');
       const isVIP = await isUserVIP(userId);
 
@@ -297,9 +305,17 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       return;
     }
 
-    // VIP access control: Check if user is VIP or game organizer
-    // Organizers can always join their own games
-    if (game.createdBy !== userId) {
+    // VIP access control: Check if user is VIP, game organizer, or has ORGANIZER role
+    // First check if user is the game creator or has ORGANIZER role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isOrganizer = user?.role === 'ORGANIZER' || game.createdBy === userId;
+
+    if (!isOrganizer) {
+      // For regular players, check VIP status
       const { isUserVIP } = await import('../../api/vip-cohort/vip-cohort.controller.js');
       const isVIP = await isUserVIP(userId);
 
