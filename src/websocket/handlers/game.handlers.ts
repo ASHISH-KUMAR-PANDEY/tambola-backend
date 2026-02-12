@@ -1064,24 +1064,24 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       }
 
       // Broadcast to winner with acknowledgment for reliable delivery
-      socket.timeout(5000).emit('game:winClaimed', {
+      const ackTimeout = setTimeout(() => {
+        enhancedLogger.warn(
+          { gameId, userId, playerId: player.id, category },
+          'game:winClaimed acknowledgment timeout - event may not have reached frontend'
+        );
+      }, 5000);
+
+      socket.emit('game:winClaimed', {
         category,
         success: true,
         message: `Congratulations! You won ${category.split('_').join(' ')}!`,
-      }, (err: Error | null) => {
-        if (err) {
-          // Event delivery failed or timed out
-          enhancedLogger.error(
-            { gameId, userId, playerId: player.id, category, error: err.message },
-            'Failed to deliver game:winClaimed event to winner - event may not have reached frontend'
-          );
-        } else {
-          // Event successfully acknowledged by frontend
-          enhancedLogger.info(
-            { gameId, userId, playerId: player.id, category },
-            'game:winClaimed event acknowledged by winner'
-          );
-        }
+      }, () => {
+        // Event successfully acknowledged by frontend
+        clearTimeout(ackTimeout);
+        enhancedLogger.info(
+          { gameId, userId, playerId: player.id, category },
+          'game:winClaimed event acknowledged by winner'
+        );
       });
 
       // Broadcast to all players and organizer in the game room (except the winner)
