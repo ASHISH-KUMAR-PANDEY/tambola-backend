@@ -1158,16 +1158,8 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
         enhancedLogger.broadcastTiming('game:winner', broadcastDuration, 1, { gameId, category });
       }
 
-      // Check if game complete (all categories won)
-      const updatedState = await gameService.getGameState(gameId);
-      if (updatedState?.wonCategories.has('FULL_HOUSE')) {
-        await gameService.updateGameStatus(gameId, GameStatus.COMPLETED);
-        // Broadcast to all players in room
-        const io = getIO();
-        io.in(`game:${gameId}`).emit('game:completed', { gameId });
-        // Note: organizer not in room, will see completion via stateSync
-        logger.info({ gameId }, 'Game completed');
-      }
+      // NOTE: Auto-complete removed - organizer must manually complete game
+      // Game continues even after all prizes are won until organizer clicks "Complete Game"
     } finally {
       await redis.del(lockKey);
     }
