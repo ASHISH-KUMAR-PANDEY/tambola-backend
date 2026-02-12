@@ -1126,6 +1126,7 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
       }, 5000);
 
       socket.emit('game:winClaimed', {
+        playerId: player.id,  // Include playerId so frontend can add winner even if store playerId is null
         category,
         success: true,
         message: `Congratulations! You won ${category.split('_').join(' ')}!`,
