@@ -49,6 +49,34 @@ export async function listGames(
   reply: FastifyReply
 ): Promise<void> {
   try {
+    // Import isUserVIP dynamically to avoid circular dependencies
+    const { isUserVIP } = await import('../vip-cohort/vip-cohort.controller.js');
+
+    // Check if user is authenticated
+    const authReq = request as any;
+    const userId = authReq.user?.userId;
+
+    if (!userId) {
+      // No authentication - return VIP-only message
+      throw new AppError(
+        'VIP_ONLY',
+        'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
+        403
+      );
+    }
+
+    // Check if user is VIP
+    const isVIP = await isUserVIP(userId);
+
+    if (!isVIP) {
+      // User not VIP - return VIP-only message
+      throw new AppError(
+        'VIP_ONLY',
+        'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
+        403
+      );
+    }
+
     const { status } = request.query as { status?: string };
 
     const where = status ? { status: status as any } : {};
@@ -92,6 +120,9 @@ export async function listGames(
 
     await reply.send({ games: gamesWithCounts });
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
     throw new AppError('LIST_GAMES_FAILED', 'Failed to fetch games', 500);
   }
 }

@@ -4,8 +4,10 @@ import * as gamesController from './games.controller.js';
 import { cleanupOldGames } from './cleanup-games.js';
 
 export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
+  // VIP-only routes (require auth and VIP status)
+  fastify.get('/', { onRequest: authMiddleware }, gamesController.listGames);
+
   // Public routes (no auth required)
-  fastify.get('/', gamesController.listGames);
   fastify.get('/my-active', gamesController.getMyActiveGames);
   fastify.get('/:gameId', gamesController.getGame);
   fastify.get('/:gameId/players/:playerId', gamesController.getPlayerDetails);

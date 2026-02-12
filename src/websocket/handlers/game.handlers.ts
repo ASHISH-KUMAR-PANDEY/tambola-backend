@@ -84,6 +84,25 @@ export async function handleLobbyJoin(socket: Socket, payload: unknown): Promise
       return;
     }
 
+    // VIP access control: Check if user is VIP or game organizer
+    // Organizers can always join their own game lobbies
+    if (game.createdBy !== userId) {
+      const { isUserVIP } = await import('../../api/vip-cohort/vip-cohort.controller.js');
+      const isVIP = await isUserVIP(userId);
+
+      if (!isVIP) {
+        socket.emit('error', {
+          code: 'VIP_ONLY',
+          message: 'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
+        });
+        enhancedLogger.warn(
+          { gameId, userId },
+          'Non-VIP user attempted to join game lobby'
+        );
+        return;
+      }
+    }
+
     // Add or update player in waiting lobby
     const lobbyPlayer = await prisma.gameLobbyPlayer.upsert({
       where: {
@@ -276,6 +295,25 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     if (!game) {
       socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
       return;
+    }
+
+    // VIP access control: Check if user is VIP or game organizer
+    // Organizers can always join their own games
+    if (game.createdBy !== userId) {
+      const { isUserVIP } = await import('../../api/vip-cohort/vip-cohort.controller.js');
+      const isVIP = await isUserVIP(userId);
+
+      if (!isVIP) {
+        socket.emit('error', {
+          code: 'VIP_ONLY',
+          message: 'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
+        });
+        enhancedLogger.warn(
+          { gameId, userId },
+          'Non-VIP user attempted to join game'
+        );
+        return;
+      }
     }
 
     // Allow game creator (organizer) to join as observer without player record

@@ -94,12 +94,14 @@ import { promotionalBannerRoutes } from './api/promotional-banner/promotional-ba
 import { youTubeEmbedRoutes } from './api/youtube-embed/youtube-embed.routes.js';
 import { youtubeLivestreamRoutes } from './api/youtube-livestream/youtube-livestream.routes.js';
 import { registrationCardRoutes } from './api/registration-card/registration-card.routes.js';
+import { vipCohortRoutes } from './api/vip-cohort/vip-cohort.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
 await fastify.register(promotionalBannerRoutes, { prefix: '/api/v1/promotional-banner' });
 await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
 await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-livestream' });
+await fastify.register(vipCohortRoutes, { prefix: '/api/v1/vip-cohort' });
 await fastify.register(registrationCardRoutes, { prefix: '/api/v1/registration-card' });
 
 // Socket.IO setup
