@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { authMiddleware, optionalAuthMiddleware } from '../../middleware/auth.middleware.js';
 import * as gamesController from './games.controller.js';
 import { cleanupOldGames } from './cleanup-games.js';
 
 export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
-  // VIP-only routes (require auth and VIP status)
-  fastify.get('/', { onRequest: authMiddleware }, gamesController.listGames);
+  // VIP-only routes (optional auth - checked in controller)
+  fastify.get('/', { onRequest: optionalAuthMiddleware }, gamesController.listGames);
 
   // Public routes (no auth required)
   fastify.get('/my-active', gamesController.getMyActiveGames);
