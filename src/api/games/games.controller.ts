@@ -55,7 +55,7 @@ export async function listGames(
     // Check if user is authenticated
     const authReq = request as any;
     const userId = authReq.user?.userId;
-    const userRole = authReq.user?.role;
+    let userRole = authReq.user?.role;
 
     if (!userId) {
       // No authentication - return VIP-only message
@@ -64,6 +64,15 @@ export async function listGames(
         'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
         403
       );
+    }
+
+    // If role not in JWT (older tokens), query from database
+    if (!userRole) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      userRole = user?.role;
     }
 
     // Organizers have full access - bypass VIP check
