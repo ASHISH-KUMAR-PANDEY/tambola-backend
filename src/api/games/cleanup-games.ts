@@ -36,14 +36,18 @@ export async function cleanupOldGames(
       return;
     }
 
-    // Delete all games
-    const result = await prisma.game.deleteMany({});
+    // Delete all games one by one (CASCADE will handle related records)
+    let deletedCount = 0;
+    for (const game of gamesToDelete) {
+      await prisma.game.delete({ where: { id: game.id } });
+      deletedCount++;
+    }
 
-    logger.info({ deleted: result.count }, 'Games deleted successfully');
+    logger.info({ deleted: deletedCount }, 'Games deleted successfully');
 
     await reply.send({
-      message: `Successfully deleted ${result.count} games`,
-      deleted: result.count
+      message: `Successfully deleted ${deletedCount} games`,
+      deleted: deletedCount
     });
   } catch (error) {
     logger.error({ error }, 'Failed to cleanup games');
