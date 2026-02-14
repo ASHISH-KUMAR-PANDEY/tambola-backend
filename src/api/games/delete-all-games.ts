@@ -29,29 +29,14 @@ export async function deleteAllGames(
       return;
     }
 
-    // Delete all games in transaction with related records
-    const result = await prisma.$transaction(async (tx) => {
-      // Get all game IDs
-      const games = await tx.game.findMany({ select: { id: true } });
-      const gameIds = games.map(g => g.id);
+    // Delete all games (CASCADE will handle related records)
+    const result = await prisma.game.deleteMany({});
 
-      // Delete related records first
-      await tx.winner.deleteMany({});
-      await tx.player.deleteMany({});
-      await tx.gameLobbyPlayer.deleteMany({});
-      await tx.prizeQueue.deleteMany({});
-
-      // Delete all games
-      const deleted = await tx.game.deleteMany({});
-
-      return deleted.count;
-    });
-
-    logger.info({ deleted: result }, 'All games deleted successfully');
+    logger.info({ deleted: result.count }, 'All games deleted successfully');
 
     await reply.send({
-      message: `Successfully deleted ALL ${result} games`,
-      deleted: result
+      message: `Successfully deleted ALL ${result.count} games`,
+      deleted: result.count
     });
   } catch (error) {
     logger.error({ error }, 'Failed to delete all games');
