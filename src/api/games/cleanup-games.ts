@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 
 /**
- * Admin cleanup endpoint to delete old ACTIVE and LOBBY games
+ * Admin cleanup endpoint to delete ALL games (ACTIVE, LOBBY, and COMPLETED)
  * Only accessible to organizers
  */
 export async function cleanupOldGames(
@@ -16,14 +16,8 @@ export async function cleanupOldGames(
 
     logger.info({ userId: authReq.user.userId }, 'Cleanup games request received');
 
-    // Find all ACTIVE and LOBBY games
+    // Find all games (ACTIVE, LOBBY, and COMPLETED)
     const gamesToDelete = await prisma.game.findMany({
-      where: {
-        OR: [
-          { status: 'ACTIVE' },
-          { status: 'LOBBY' }
-        ]
-      },
       select: {
         id: true,
         status: true,
@@ -42,15 +36,8 @@ export async function cleanupOldGames(
       return;
     }
 
-    // Delete all ACTIVE and LOBBY games
-    const result = await prisma.game.deleteMany({
-      where: {
-        OR: [
-          { status: 'ACTIVE' },
-          { status: 'LOBBY' }
-        ]
-      }
-    });
+    // Delete all games
+    const result = await prisma.game.deleteMany({});
 
     logger.info({ deleted: result.count }, 'Games deleted successfully');
 
