@@ -29,20 +29,31 @@ export async function deleteAllGames(
       return;
     }
 
-    // Delete all games (CASCADE will handle related records)
-    const result = await prisma.game.deleteMany({});
+    // Delete all games one by one (CASCADE will handle related records)
+    const games = await prisma.game.findMany({ select: { id: true } });
+    let deletedCount = 0;
 
-    logger.info({ deleted: result.count }, 'All games deleted successfully');
+    for (const game of games) {
+      await prisma.game.delete({ where: { id: game.id } });
+      deletedCount++;
+    }
+
+    logger.info({ deleted: deletedCount }, 'All games deleted successfully');
 
     await reply.send({
-      message: `Successfully deleted ALL ${result.count} games`,
-      deleted: result.count
+      message: `Successfully deleted ALL ${deletedCount} games`,
+      deleted: deletedCount
     });
   } catch (error) {
     logger.error({ error }, 'Failed to delete all games');
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+
+    logger.error({ errorMessage, errorStack }, 'Detailed error info');
+
     await reply.status(500).send({
       error: 'DELETE_ALL_FAILED',
-      message: 'Failed to delete all games'
+      message: `Failed to delete all games: ${errorMessage}`
     });
   }
 }
