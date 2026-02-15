@@ -280,32 +280,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       return;
     }
 
-    // VIP access control: Check if user is VIP, game organizer, or has ORGANIZER role
-    // First check if user is the game creator or has ORGANIZER role
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    });
-
-    const isOrganizer = user?.role === 'ORGANIZER' || game.createdBy === userId;
-
-    if (!isOrganizer) {
-      // For regular players, check VIP status
-      const { isUserVIP } = await import('../../api/vip-cohort/vip-cohort.controller.js');
-      const isVIP = await isUserVIP(userId);
-
-      if (!isVIP) {
-        socket.emit('error', {
-          code: 'VIP_ONLY',
-          message: 'यह गेम केवल STAGE-VIP सदस्यों के लिए है, शामिल होने के लिए STAGE के VIP सदस्य बनें।',
-        });
-        enhancedLogger.warn(
-          { gameId, userId },
-          'Non-VIP user attempted to join game'
-        );
-        return;
-      }
-    }
+    // All games are now open to all users - VIP restriction removed
 
     // Allow game creator (organizer) to join as observer without player record
     // Organizer MUST join the game room to receive real-time broadcasts (game:winner, etc)
