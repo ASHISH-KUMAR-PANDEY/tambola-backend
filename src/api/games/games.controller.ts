@@ -24,6 +24,7 @@ export async function createGame(
         scheduledTime: new Date(body.scheduledTime),
         createdBy: authReq.user.userId,
         prizes: body.prizes,
+        isPublic: body.isPublic ?? false,
       },
     });
 
@@ -33,6 +34,7 @@ export async function createGame(
       status: game.status,
       createdBy: game.createdBy,
       prizes: game.prizes,
+      isPublic: game.isPublic,
       createdAt: game.createdAt,
     });
   } catch (error) {
@@ -65,6 +67,7 @@ export async function listGames(
         calledNumbers: true,
         currentNumber: true,
         createdBy: true,
+        isPublic: true,
       },
       orderBy: { scheduledTime: 'desc' },
       take: 50,
@@ -86,6 +89,7 @@ export async function listGames(
           calledNumbers: game.calledNumbers,
           currentNumber: game.currentNumber,
           createdBy: game.createdBy,
+          isPublic: game.isPublic,
           playerCount,
         };
       })

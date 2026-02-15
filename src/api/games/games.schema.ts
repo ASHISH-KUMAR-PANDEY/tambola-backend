@@ -9,6 +9,7 @@ export const createGameSchema = z.object({
     bottomLine: z.number().positive().optional(),
     fullHouse: z.number().positive(),
   }),
+  isPublic: z.boolean().optional().default(false), // If true, game is open to all; if false, VIP only
 });
 
 export const updateGameStatusSchema = z.object({
