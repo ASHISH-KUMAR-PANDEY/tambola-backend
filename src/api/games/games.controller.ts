@@ -51,8 +51,7 @@ export async function listGames(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    // NOTE: VIP check has been moved to game join (WebSocket handler)
-    // Everyone can see games, but only VIP users can join them
+    // All games are open to all users - VIP restriction removed
     const query = request.query as { status?: string; userId?: string };
     const where = query.status ? { status: query.status as any } : {};
     const games = await prisma.game.findMany({

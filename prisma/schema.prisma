@@ -65,7 +65,7 @@ model Game {
   prizes        Json
   calledNumbers Int[]              @default([])
   currentNumber Int?
-  isPublic      Boolean            @default(false) // If true, available to all users; if false, VIP only
+  isPublic      Boolean            @default(true) // All games are open to all users by default
   lobbyPlayers  GameLobbyPlayer[]  // Players in waiting lobby
   players       Player[]           // Players with tickets (after game starts)
   winners       Winner[]
