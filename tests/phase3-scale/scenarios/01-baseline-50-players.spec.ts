@@ -1,8 +1,10 @@
 /**
- * Test 1: Baseline - Full Game Flow with 50 Players
+ * Test 1: Baseline - Full Game Flow with 200 Players
  *
- * Validates complete game with 50 concurrent players:
- * - All players join within 30 seconds
+ * Validates complete game with 200 concurrent players:
+ * - All players join lobby within 30 seconds
+ * - Organizer starts game
+ * - Players transition from lobby to active game
  * - Organizer calls 75 numbers
  * - Players mark numbers realistically
  * - Multiple win claims (Early 5, Lines, Full House)
@@ -24,7 +26,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_URL = process.env.BACKEND_URL || 'https://nhuh2kfbwk.ap-south-1.awsapprunner.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://main.d262mxsv2xemak.amplifyapp.com';
 
-test.describe('Baseline: 50 Player Game Flow', () => {
+test.describe('Baseline: 200 Player Game Flow', () => {
   let accounts: any;
   let organizer: Organizer;
   let socketPlayers: SocketPlayer[] = [];
@@ -43,11 +45,11 @@ test.describe('Baseline: 50 Player Game Flow', () => {
     console.log(`\n✅ Loaded ${accounts.players.length} players, ${accounts.organizers.length} organizers`);
   });
 
-  test('Full game with 50 concurrent players', async () => {
+  test('Full game with 200 concurrent players', async () => {
     metrics = new MetricsCollector();
 
     console.log('\n╔════════════════════════════════════════════════════════════╗');
-    console.log('║   TEST 1: BASELINE - 50 PLAYER GAME FLOW                  ║');
+    console.log('║   TEST 1: BASELINE - 200 PLAYER GAME FLOW                 ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
 
     // Step 1: Create organizer
@@ -60,14 +62,13 @@ test.describe('Baseline: 50 Player Game Flow', () => {
 
     await organizer.connect();
     gameId = await organizer.createGame();
-    await organizer.joinGame(gameId);
     console.log(`✅ Organizer ready, game: ${gameId}\n`);
 
-    // Step 2: Create 50 socket players (25 with auto-mark)
-    console.log('Step 2: Connecting 50 socket players...');
-    const playerAccounts = accounts.players.slice(0, 50);
+    // Step 2: Create 200 socket players
+    console.log('Step 2: Connecting 200 socket players...');
+    const playerAccounts = accounts.players.slice(0, 200);
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 200; i++) {
       const player = new SocketPlayer({
         account: playerAccounts[i],
         backendUrl: BACKEND_URL,
@@ -78,54 +79,70 @@ test.describe('Baseline: 50 Player Game Flow', () => {
       socketPlayers.push(player);
 
       // Progress indicator
-      if ((i + 1) % 10 === 0) {
-        console.log(`  Connected: ${i + 1}/50 players`);
+      if ((i + 1) % 20 === 0) {
+        console.log(`  Connected: ${i + 1}/200 players`);
       }
     }
-    console.log(`✅ All 50 socket players connected\n`);
+    console.log(`✅ All 200 socket players connected\n`);
 
-    // Step 3: All players join game (staggered within 30 seconds)
-    console.log('Step 3: Players joining game (staggered joins)...');
-    const joinPromises = socketPlayers.map((player, index) => {
-      const delay = Math.floor((index / 50) * 30000); // Spread over 30 seconds
+    // Step 3: All players join LOBBY (staggered within 30 seconds)
+    console.log('Step 3: Players joining lobby (staggered joins)...');
+    const lobbyJoinPromises = socketPlayers.map((player, index) => {
+      const delay = Math.floor((index / 200) * 30000); // Spread over 30 seconds
       return new Promise<void>(async (resolve) => {
         setTimeout(async () => {
-          await player.joinGame(gameId);
+          await player.joinLobby(gameId);
           resolve();
         }, delay);
       });
     });
 
-    await Promise.all(joinPromises);
-    console.log(`✅ All 50 players joined game\n`);
+    await Promise.all(lobbyJoinPromises);
+    console.log(`✅ All 200 players joined lobby\n`);
 
-    // Validate: All players have unique tickets
-    console.log('Validating: Unique tickets...');
+    // Step 4: Players set up listeners for game:starting BEFORE organizer starts
+    console.log('Step 4: Setting up game:starting listeners...');
+    const gameStartWaitPromises = socketPlayers.map(player => player.waitForGameStart());
+    console.log('✅ Listeners set up\n');
+
+    // Step 5: Organizer starts game
+    console.log('Step 5: Organizer starting game...');
+    await organizer.startGame();
+    console.log('✅ Organizer started game\n');
+
+    // Step 6: Wait for all players to receive game:starting
+    console.log('Step 6: Waiting for players to receive game:starting...');
+    await Promise.all(gameStartWaitPromises);
+    console.log('✅ All players received game:starting\n');
+
+    // Step 7: All players join active game
+    console.log('Step 7: Players joining active game...');
+    const gameJoinPromises = socketPlayers.map(player => player.joinGame(gameId));
+    await Promise.all(gameJoinPromises);
+    console.log(`✅ All 200 players joined game\n`);
+
+    // Step 8: Validate all players have unique tickets
+    console.log('Step 8: Validating unique tickets...');
     Validators.validateUniqueTickets(socketPlayers);
     console.log('✅ All tickets are unique\n');
 
-    // Step 4: Enable auto-mark for 25 players (simulate realistic marking)
-    console.log('Step 4: Enabling auto-mark for 25 players...');
-    for (let i = 0; i < 25; i++) {
+    // Step 9: Enable auto-mark for 100 players (simulate realistic marking)
+    console.log('Step 9: Enabling auto-mark for 100 players...');
+    for (let i = 0; i < 100; i++) {
       socketPlayers[i].enableAutoMark();
     }
-    console.log('✅ Auto-mark enabled for 25 players\n');
+    console.log('✅ Auto-mark enabled for 100 players\n');
 
-    // Step 5: Start game
-    console.log('Step 5: Starting game...');
-    await organizer.startGame();
-    console.log('✅ Game started\n');
-
-    // Step 6: Call 75 numbers
-    console.log('Step 6: Calling 75 numbers...');
+    // Step 10: Call 75 numbers
+    console.log('Step 10: Calling 75 numbers...');
     const calledNumbers = await organizer.callRandomNumbers(75, 1000);
     console.log(`✅ Called ${calledNumbers.length} numbers\n`);
 
     // Wait for all events to propagate
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Step 7: Validate event broadcast
-    console.log('Step 7: Validating event broadcast...');
+    // Step 11: Validate event broadcast
+    console.log('Step 11: Validating event broadcast...');
     Validators.validateEventBroadcast(
       socketPlayers,
       (player) => player.calledNumbers.length === 75,
@@ -138,8 +155,8 @@ test.describe('Baseline: 50 Player Game Flow', () => {
     Validators.validateConsistentCalledNumbers(socketPlayers);
     console.log('✅ All players have consistent called numbers\n');
 
-    // Step 8: Collect latency metrics
-    console.log('Step 8: Analyzing latency metrics...');
+    // Step 12: Collect latency metrics
+    console.log('Step 12: Analyzing latency metrics...');
     socketPlayers.forEach((player) => {
       const playerMetrics = player.getMetrics();
       if (playerMetrics.lastEventLatency > 0) {
@@ -160,10 +177,10 @@ test.describe('Baseline: 50 Player Game Flow', () => {
       console.log(`✅ P90 latency within target (<500ms)\n`);
     }
 
-    // Step 9: Validate auto-marked players
-    console.log('Step 9: Validating auto-mark functionality...');
-    const markedCounts = socketPlayers.slice(0, 25).map(p => p.markedNumbers.size);
-    const avgMarked = Math.round(markedCounts.reduce((a, b) => a + b, 0) / 25);
+    // Step 13: Validate auto-marked players
+    console.log('Step 13: Validating auto-mark functionality...');
+    const markedCounts = socketPlayers.slice(0, 100).map(p => p.markedNumbers.size);
+    const avgMarked = Math.round(markedCounts.reduce((a, b) => a + b, 0) / 100);
     console.log(`  Average marked numbers: ${avgMarked} (expected: ~15)`);
 
     if (avgMarked > 0) {
@@ -172,8 +189,8 @@ test.describe('Baseline: 50 Player Game Flow', () => {
       console.log('⚠️  WARNING: Auto-mark may not be working\n');
     }
 
-    // Step 10: Test win claim (simulate one player with Early 5)
-    console.log('Step 10: Testing win claim (Early 5)...');
+    // Step 14: Test win claim (simulate one player with Early 5)
+    console.log('Step 14: Testing win claim (Early 5)...');
     // Find a player who can claim Early 5
     let early5Player: SocketPlayer | null = null;
     for (const player of socketPlayers) {
@@ -217,7 +234,7 @@ test.describe('Baseline: 50 Player Game Flow', () => {
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║                    TEST COMPLETE                           ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
-    console.log(`  Players: 50`);
+    console.log(`  Players: 200`);
     console.log(`  Numbers called: 75`);
     console.log(`  P90 latency: ${latencyStats.p90}ms`);
     console.log(`  Winners: ${socketPlayers[0].winners.length}`);

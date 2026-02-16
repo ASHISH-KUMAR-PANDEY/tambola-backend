@@ -4,7 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright configuration for Phase 3 Scale Testing
  */
 export default defineConfig({
-  testDir: './scenarios',
+  testDir: './',
+  testMatch: ['**/*.spec.ts'], // Match all spec files in scenarios and diagnostics
 
   // Maximum time one test can run
   timeout: 30 * 60 * 1000, // 30 minutes (for long-running scale tests)

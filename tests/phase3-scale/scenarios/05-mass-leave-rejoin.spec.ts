@@ -2,11 +2,11 @@
  * Test 5: Mass Leave and Rejoin
  *
  * Validates leave/rejoin flow at scale:
- * - 50 players in active game, 30 numbers called
- * - 20 players leave game
- * - Game continues with remaining 30 players
+ * - 200 players in active game, 30 numbers called
+ * - 80 players leave game
+ * - Game continues with remaining 120 players
  * - Organizer calls 10 more numbers (total: 40)
- * - All 20 players rejoin
+ * - All 80 players rejoin
  * - Verify state restoration (tickets, marked numbers, called numbers, winners)
  */
 
@@ -40,11 +40,11 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
     console.log(`\n✅ Loaded test accounts`);
   });
 
-  test('20 players leave and rejoin during active game', async () => {
+  test('80 players leave and rejoin during active game', async () => {
     metrics = new MetricsCollector();
 
     console.log('\n╔════════════════════════════════════════════════════════════╗');
-    console.log('║   TEST 5: MASS LEAVE/REJOIN (20 OF 50 PLAYERS)            ║');
+    console.log('║   TEST 5: MASS LEAVE/REJOIN (80 OF 200 PLAYERS)           ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
 
     // Step 1: Setup organizer
@@ -57,12 +57,11 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
 
     await organizer.connect();
     gameId = await organizer.createGame();
-    await organizer.joinGame(gameId);
     console.log(`✅ Organizer ready, game: ${gameId}\n`);
 
-    // Step 2: Connect 50 socket players
-    console.log('Step 2: Connecting 50 socket players...');
-    for (let i = 0; i < 50; i++) {
+    // Step 2: Connect 200 socket players
+    console.log('Step 2: Connecting 200 socket players...');
+    for (let i = 0; i < 200; i++) {
       const player = new SocketPlayer({
         account: accounts.players[i],
         backendUrl: BACKEND_URL,
@@ -71,39 +70,64 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
       await player.connect();
       socketPlayers.push(player);
 
-      if ((i + 1) % 10 === 0) {
-        console.log(`  Connected: ${i + 1}/50 players`);
+      if ((i + 1) % 20 === 0) {
+        console.log(`  Connected: ${i + 1}/200 players`);
       }
     }
-    console.log('✅ All 50 players connected\n');
+    console.log('✅ All 200 players connected\n');
 
-    // Step 3: All players join game
-    console.log('Step 3: Players joining game...');
-    await Promise.all(socketPlayers.map(p => p.joinGame(gameId)));
-    console.log('✅ All 50 players joined\n');
+    // Step 3: All players join LOBBY (staggered to avoid overwhelming backend)
+    console.log('Step 3: Players joining lobby (staggered over 30 seconds)...');
+    const lobbyJoinPromises = socketPlayers.map((player, index) => {
+      const delay = Math.floor((index / 200) * 30000); // Spread over 30 seconds
+      return new Promise<void>(async (resolve) => {
+        setTimeout(async () => {
+          await player.joinLobby(gameId);
+          resolve();
+        }, delay);
+      });
+    });
+    await Promise.all(lobbyJoinPromises);
+    console.log('✅ All 200 players joined lobby\n');
 
-    // Step 4: Enable auto-mark
-    console.log('Step 4: Enabling auto-mark...');
-    socketPlayers.forEach(p => p.enableAutoMark());
-    console.log('✅ Auto-mark enabled\n');
+    // Step 4: Players set up listeners for game:starting BEFORE organizer starts
+    console.log('Step 4: Setting up game:starting listeners...');
+    const gameStartWaitPromises = socketPlayers.map(player => player.waitForGameStart());
+    console.log('✅ Listeners set up\n');
 
-    // Step 5: Start game
-    console.log('Step 5: Starting game...');
+    // Step 5: Organizer starts game
+    console.log('Step 5: Organizer starting game...');
     await organizer.startGame();
     console.log('✅ Game started\n');
 
-    // Step 6: Call 30 numbers
-    console.log('Step 6: Calling 30 numbers...');
+    // Step 6: Wait for all players to receive game:starting
+    console.log('Step 6: Waiting for players to receive game:starting...');
+    await Promise.all(gameStartWaitPromises);
+    console.log('✅ All players received game:starting\n');
+
+    // Step 7: Players join active game
+    console.log('Step 7: Players joining active game...');
+    const gameJoinPromises = socketPlayers.map(player => player.joinGame(gameId));
+    await Promise.all(gameJoinPromises);
+    console.log('✅ All 200 players in active game\n');
+
+    // Step 8: Enable auto-mark
+    console.log('Step 8: Enabling auto-mark...');
+    socketPlayers.forEach(p => p.enableAutoMark());
+    console.log('✅ Auto-mark enabled\n');
+
+    // Step 9: Call 30 numbers
+    console.log('Step 9: Calling 30 numbers...');
     await organizer.callRandomNumbers(30, 500);
     console.log('✅ Called 30 numbers\n');
 
     // Wait for auto-mark
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Step 7: Record state of 20 players before leaving
-    console.log('Step 7: Recording state before leaving...');
-    const leavingPlayers = socketPlayers.slice(0, 20);
-    const remainingPlayers = socketPlayers.slice(20, 50);
+    // Step 10: Record state of 80 players before leaving
+    console.log('Step 10: Recording state before leaving...');
+    const leavingPlayers = socketPlayers.slice(0, 80);
+    const remainingPlayers = socketPlayers.slice(80, 200);
 
     const stateBeforeLeave = leavingPlayers.map(p => ({
       playerId: p.playerId,
@@ -120,24 +144,24 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
     });
     console.log('✅ State recorded\n');
 
-    // Step 8: 20 players leave game
-    console.log('Step 8: 20 players leaving game...');
+    // Step 11: 80 players leave game
+    console.log('Step 11: 80 players leaving game...');
     leavingPlayers.forEach(p => p.leaveGame());
-    console.log('✅ 20 players left\n');
+    console.log('✅ 80 players left\n');
 
     // Wait a bit
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Step 9: Game continues with remaining 30 players
-    console.log('Step 9: Continuing game (calling 10 more numbers)...');
+    // Step 12: Game continues with remaining 120 players
+    console.log('Step 12: Continuing game (calling 10 more numbers)...');
     await organizer.callRandomNumbers(10, 500);
     console.log('✅ Called 10 more numbers (total: 40)\n');
 
     // Wait for events
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Validate: Remaining 30 players have 40 called numbers
-    console.log('Validating: Remaining 30 players have 40 called numbers...');
+    // Validate: Remaining 120 players have 40 called numbers
+    console.log('Validating: Remaining 120 players have 40 called numbers...');
     const allAt40 = remainingPlayers.every(p => p.calledNumbers.length === 40);
     if (allAt40) {
       console.log('✅ All remaining players at 40 called numbers\n');
@@ -145,13 +169,13 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
       throw new Error('Remaining players not all at 40 called numbers');
     }
 
-    // Step 10: 20 players rejoin game
-    console.log('Step 10: 20 players rejoining game...');
+    // Step 13: 80 players rejoin game
+    console.log('Step 13: 80 players rejoining game...');
     const rejoinStartTime = Date.now();
 
     // Create NEW socket connections for rejoining players
     const rejoinedPlayers: SocketPlayer[] = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 80; i++) {
       const player = new SocketPlayer({
         account: accounts.players[i],
         backendUrl: BACKEND_URL,
@@ -162,19 +186,19 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
       await player.joinGame(gameId);
       rejoinedPlayers.push(player);
 
-      if ((i + 1) % 5 === 0) {
-        console.log(`  Rejoined: ${i + 1}/20 players`);
+      if ((i + 1) % 10 === 0) {
+        console.log(`  Rejoined: ${i + 1}/80 players`);
       }
     }
 
     const rejoinDuration = Date.now() - rejoinStartTime;
-    console.log(`✅ All 20 players rejoined in ${rejoinDuration}ms\n`);
+    console.log(`✅ All 80 players rejoined in ${rejoinDuration}ms\n`);
 
     // Wait for state sync
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Step 11: Validate state restoration
-    console.log('Step 11: Validating state after rejoin...');
+    // Step 14: Validate state restoration
+    console.log('Step 14: Validating state after rejoin...');
 
     // Check: All rejoined players have 40 called numbers (including 10 called during absence)
     const allRejoinedAt40 = rejoinedPlayers.every(p => p.calledNumbers.length === 40);
@@ -223,22 +247,22 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
     }
     console.log('✅ Marked numbers validation complete\n');
 
-    // Step 12: Continue game to verify everything works
-    console.log('Step 12: Final validation - calling 5 more numbers...');
+    // Step 15: Continue game to verify everything works
+    console.log('Step 15: Final validation - calling 5 more numbers...');
     await organizer.callRandomNumbers(5, 500);
     console.log('✅ Called 5 more numbers (total: 45)\n');
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Validate: ALL 50 players (30 remaining + 20 rejoined) now have 45 called numbers
-    console.log('Validating: All 50 players at 45 called numbers...');
+    // Validate: ALL 200 players (120 remaining + 80 rejoined) now have 45 called numbers
+    console.log('Validating: All 200 players at 45 called numbers...');
     const allPlayersAt45 = [
       ...remainingPlayers,
       ...rejoinedPlayers,
     ].every(p => p.calledNumbers.length === 45);
 
     if (allPlayersAt45) {
-      console.log('✅ All 50 players synced at 45 called numbers\n');
+      console.log('✅ All 200 players synced at 45 called numbers\n');
     } else {
       throw new Error('Not all players synced after rejoin');
     }
@@ -247,8 +271,8 @@ test.describe('Leave/Rejoin: Mass Leave and Rejoin', () => {
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║                    TEST COMPLETE                           ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
-    console.log(`  Players left: 20`);
-    console.log(`  Players remained: 30`);
+    console.log(`  Players left: 80`);
+    console.log(`  Players remained: 120`);
     console.log(`  Numbers called during absence: 10`);
     console.log(`  Numbers called after rejoin: 5`);
     console.log(`  Final called numbers: 45`);

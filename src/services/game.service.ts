@@ -146,6 +146,37 @@ export async function recordWinner(
 }
 
 /**
+ * Gets available (unclaimed) prizes for a game
+ */
+export async function getAvailablePrizes(gameId: string): Promise<{
+  EARLY_5: boolean;
+  TOP_LINE: boolean;
+  MIDDLE_LINE: boolean;
+  BOTTOM_LINE: boolean;
+  FULL_HOUSE: boolean;
+}> {
+  const gameState = await getGameState(gameId);
+
+  if (!gameState) {
+    return {
+      EARLY_5: true,
+      TOP_LINE: true,
+      MIDDLE_LINE: true,
+      BOTTOM_LINE: true,
+      FULL_HOUSE: true,
+    };
+  }
+
+  return {
+    EARLY_5: !gameState.wonCategories.has('EARLY_5'),
+    TOP_LINE: !gameState.wonCategories.has('TOP_LINE'),
+    MIDDLE_LINE: !gameState.wonCategories.has('MIDDLE_LINE'),
+    BOTTOM_LINE: !gameState.wonCategories.has('BOTTOM_LINE'),
+    FULL_HOUSE: !gameState.wonCategories.has('FULL_HOUSE'),
+  };
+}
+
+/**
  * Increments player count
  */
 export async function incrementPlayerCount(gameId: string): Promise<number> {

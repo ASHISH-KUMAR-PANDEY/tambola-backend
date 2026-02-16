@@ -52,7 +52,7 @@ export class Organizer {
     return new Promise((resolve, reject) => {
       this.socket = io(this.backendUrl, {
         auth: { userId: this.account.id },
-        transports: ['polling'],
+        transports: ['websocket'], // Use WebSocket for EC2 + ALB
       });
 
       this.socket.on('connect', () => {
@@ -149,24 +149,31 @@ export class Organizer {
     });
   }
 
+  /**
+   * Start the game - transitions from lobby to active game
+   * Note: Backend broadcasts game:starting event, doesn't use callbacks
+   */
   async startGame(): Promise<void> {
     if (!this.socket || !this.gameId) {
       throw new Error('Not in a game');
     }
 
     return new Promise((resolve, reject) => {
-      this.socket!.emit('game:start', { gameId: this.gameId });
-
-      this.socket!.once('game:started', () => {
-        this.log('Game started');
+      // Listen for game:starting broadcast (sent to all in lobby)
+      this.socket!.once('game:starting', () => {
+        this.log('Game started (received game:starting)');
         resolve();
       });
 
-      this.socket!.once('game:error', (error) => {
+      this.socket!.once('error', (error) => {
         reject(new Error(error.message || 'Failed to start game'));
       });
 
-      setTimeout(() => reject(new Error('Start timeout')), 10000);
+      // Emit game:start
+      this.socket!.emit('game:start', { gameId: this.gameId });
+
+      // Timeout after 15 seconds
+      setTimeout(() => reject(new Error('Start timeout')), 15000);
     });
   }
 

@@ -1,0 +1,136 @@
+{
+  "timestamp": "2026-02-14T17:17:40.645Z",
+  "totalTests": 14,
+  "passedTests": 2,
+  "failedTests": 2,
+  "skippedTests": 10,
+  "totalDurationMs": 535718,
+  "results": [
+    {
+      "id": 1,
+      "file": "01-baseline-50-players.spec.ts",
+      "name": "Baseline: 200 Player Game Flow",
+      "enabled": true,
+      "status": "PASSED",
+      "duration": 170116,
+      "error": null
+    },
+    {
+      "id": 2,
+      "file": "02-rapid-joins.spec.ts",
+      "name": "Rapid Player Joins (Stress Test)",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 3,
+      "file": "03-concurrent-hard-refresh.spec.ts",
+      "name": "Concurrent Hard Refresh (10 Players)",
+      "enabled": true,
+      "status": "FAILED",
+      "duration": 31713,
+      "error": "Exit code: 1"
+    },
+    {
+      "id": 4,
+      "file": "04-hard-refresh-after-win.spec.ts",
+      "name": "Hard Refresh After Winning",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 5,
+      "file": "05-mass-leave-rejoin.spec.ts",
+      "name": "Mass Leave/Rejoin (80 of 200 Players)",
+      "enabled": true,
+      "status": "PASSED",
+      "duration": 134566,
+      "error": null
+    },
+    {
+      "id": 6,
+      "file": "06-leave-during-win-claim.spec.ts",
+      "name": "Leave During Win Claim",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 7,
+      "file": "07-network-blip-15-players.spec.ts",
+      "name": "Network Blip (15 Players)",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 8,
+      "file": "08-long-outage-5-players.spec.ts",
+      "name": "Long Network Outage (5 Players)",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 9,
+      "file": "09-early-5-race.spec.ts",
+      "name": "Early 5 Race (5 of 200 Players)",
+      "enabled": true,
+      "status": "FAILED",
+      "duration": 79311,
+      "error": "Exit code: 1"
+    },
+    {
+      "id": 10,
+      "file": "10-full-house-race-3-players.spec.ts",
+      "name": "Full House Race (3 Players)",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 11,
+      "file": "11-multiple-tabs-same-player.spec.ts",
+      "name": "Multiple Tabs Same Player",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 12,
+      "file": "12-browser-back-button.spec.ts",
+      "name": "Browser Back Button",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 13,
+      "file": "13-organizer-hard-refresh.spec.ts",
+      "name": "Organizer Hard Refresh",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    },
+    {
+      "id": 14,
+      "file": "14-rapid-number-calling.spec.ts",
+      "name": "Rapid Number Calling",
+      "enabled": false,
+      "status": "SKIPPED",
+      "duration": 0,
+      "error": null
+    }
+  ]
+}

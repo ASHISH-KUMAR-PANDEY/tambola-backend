@@ -12,15 +12,15 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const SCENARIOS = [
-  { id: 1, file: '01-baseline-50-players.spec.ts', name: 'Baseline: 50 Player Game Flow', enabled: true },
+  { id: 1, file: '01-baseline-50-players.spec.ts', name: 'Baseline: 200 Player Game Flow', enabled: true },
   { id: 2, file: '02-rapid-joins.spec.ts', name: 'Rapid Player Joins (Stress Test)', enabled: false }, // TODO: Create
   { id: 3, file: '03-concurrent-hard-refresh.spec.ts', name: 'Concurrent Hard Refresh (10 Players)', enabled: true },
   { id: 4, file: '04-hard-refresh-after-win.spec.ts', name: 'Hard Refresh After Winning', enabled: false }, // TODO: Create
-  { id: 5, file: '05-mass-leave-rejoin.spec.ts', name: 'Mass Leave/Rejoin (20 Players)', enabled: true },
+  { id: 5, file: '05-mass-leave-rejoin.spec.ts', name: 'Mass Leave/Rejoin (80 of 200 Players)', enabled: true },
   { id: 6, file: '06-leave-during-win-claim.spec.ts', name: 'Leave During Win Claim', enabled: false }, // TODO: Create
   { id: 7, file: '07-network-blip-15-players.spec.ts', name: 'Network Blip (15 Players)', enabled: false }, // TODO: Create
   { id: 8, file: '08-long-outage-5-players.spec.ts', name: 'Long Network Outage (5 Players)', enabled: false }, // TODO: Create
-  { id: 9, file: '09-early-5-race.spec.ts', name: 'Early 5 Race (5 Players)', enabled: true },
+  { id: 9, file: '09-early-5-race.spec.ts', name: 'Early 5 Race (5 of 200 Players)', enabled: true },
   { id: 10, file: '10-full-house-race-3-players.spec.ts', name: 'Full House Race (3 Players)', enabled: false }, // TODO: Create
   { id: 11, file: '11-multiple-tabs-same-player.spec.ts', name: 'Multiple Tabs Same Player', enabled: false }, // TODO: Create
   { id: 12, file: '12-browser-back-button.spec.ts', name: 'Browser Back Button', enabled: false }, // TODO: Create

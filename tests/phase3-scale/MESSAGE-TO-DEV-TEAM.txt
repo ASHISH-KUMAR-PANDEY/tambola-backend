@@ -1,0 +1,109 @@
+Subject: 🚨 URGENT: Game Start Fails with 20+ Players - WebSocket Fix Needed
+
+Hi Team,
+
+We've completed Phase 3 load testing and discovered a critical bottleneck that blocks production scaling beyond 15-18 players per game.
+
+═══════════════════════════════════════════════════════════════
+
+PROBLEM:
+Games fail to start when 20+ players are connected. The game start broadcast times out after 10 seconds.
+
+IMPACT:
+- Current reliable capacity: 15-18 players per game
+- Target capacity: 50+ players per game
+- Status: Production blocker
+
+ROOT CAUSE:
+Socket.IO is using HTTP long-polling instead of WebSocket. Broadcasting events to 20+ polling connections takes >10 seconds.
+
+═══════════════════════════════════════════════════════════════
+
+SOLUTION (2-4 hours work):
+
+1. Backend: Add 'websocket' to Socket.IO transports array
+2. Frontend: Add 'websocket' to Socket.IO transports array
+3. Verify AWS App Runner supports WebSocket (should by default)
+
+EXPECTED RESULT:
+- Game start time: >10s → <500ms for 20 players
+- Capacity: 15-18 → 50+ players per game
+
+═══════════════════════════════════════════════════════════════
+
+DOCUMENTATION PROVIDED:
+
+📄 DEV-ISSUE-SUMMARY.md
+   Quick overview with code snippets (5 min read)
+
+📋 DEV-ISSUE-REPORT.md
+   Complete technical analysis with testing procedures (15 min read)
+
+✅ DEV-IMPLEMENTATION-CHECKLIST.md
+   Step-by-step implementation and testing checklist
+
+All files located in:
+tests/phase3-scale/
+
+═══════════════════════════════════════════════════════════════
+
+EVIDENCE:
+
+Test Results:
+✅ 1-18 players: Works perfectly (<2s game start)
+❌ 20+ players: Times out (>10s game start)
+
+Actual test output:
+✅ Game created successfully
+✅ 20 players connected successfully
+✅ 20 players joined game (2951ms)
+❌ Game start - TIMEOUT after 10 seconds
+
+All diagnostic tests and evidence available in test suite.
+
+═══════════════════════════════════════════════════════════════
+
+TESTING:
+
+After implementation, run:
+
+cd tests/phase3-scale
+npx playwright test diagnostics/ --reporter=list
+
+All 5 tests should pass (including 20-player test that currently fails).
+
+═══════════════════════════════════════════════════════════════
+
+PRIORITY: P0 - Critical
+EFFORT: 2-4 hours
+TYPE: Configuration change (low risk)
+
+This is not an architectural issue - the code is solid. We just need to enable WebSocket transport in Socket.IO configuration.
+
+Please review the documents and let me know:
+1. When you can start on this
+2. Any questions or blockers
+3. ETA for staging deployment
+
+The test suite is ready and waiting to validate the fix.
+
+Thanks!
+
+---
+
+Quick Start Guide:
+
+Backend change:
+const io = new Server(httpServer, {
+  transports: ['websocket', 'polling'], // Add 'websocket'
+  allowUpgrades: true,
+});
+
+Frontend change:
+const socket = io(backendUrl, {
+  transports: ['websocket', 'polling'], // Add 'websocket'
+  upgrade: true,
+});
+
+Test:
+npx playwright test diagnostics/01-join-latency-test.spec.ts --reporter=list

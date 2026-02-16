@@ -321,6 +321,10 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         ticket: null,
       });
 
+      // Get available prizes for organizer view
+      const availablePrizes = await gameService.getAvailablePrizes(gameId);
+      const isMidGameJoin = game.status === GameStatus.ACTIVE && (game.calledNumbers as number[]).length > 0;
+
       // Send current game state
       socket.emit('game:stateSync', {
         calledNumbers: game.calledNumbers || [],
@@ -330,6 +334,8 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
           userName: p.userName,
         })),
         winners: winnersWithDetails,
+        availablePrizes: availablePrizes,
+        isMidGameJoin: isMidGameJoin,
       });
 
       logger.info({ gameId, userId, role: 'organizer' }, 'Organizer joined game as observer');
@@ -354,20 +360,31 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       socketId: socket.id,
     }, 'Player attempting to join game');
 
-    // If game is not in LOBBY, only allow if player already joined (rejoining)
-    if (game.status !== GameStatus.LOBBY && !existingPlayer) {
+    // Allow mid-game joins during ACTIVE status
+    // Block joins only if game is COMPLETED or CANCELLED
+    if ((game.status === GameStatus.COMPLETED || game.status === GameStatus.CANCELLED) && !existingPlayer) {
       logger.warn({
         gameId,
         userId,
         gameStatus: game.status,
         socketId: socket.id,
-      }, 'Player rejected - game already started and no player record found');
+      }, 'Player rejected - game has ended');
 
       socket.emit('error', {
-        code: 'GAME_ALREADY_STARTED',
-        message: 'Cannot join game that has already started',
+        code: 'GAME_ENDED',
+        message: 'Cannot join game that has ended',
       });
       return;
+    }
+
+    // Log if player is joining mid-game
+    if (game.status === GameStatus.ACTIVE && !existingPlayer) {
+      logger.info({
+        gameId,
+        userId,
+        calledNumbersCount: (game.calledNumbers as number[]).length,
+        socketId: socket.id,
+      }, 'Player joining mid-game');
     }
 
     if (existingPlayer) {
@@ -402,11 +419,17 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         .filter(w => w.playerId === existingPlayer.id)
         .map(w => w.category);
 
+      // Get available prizes for mid-game join support
+      const availablePrizes = await gameService.getAvailablePrizes(gameId);
+      const isMidGameJoin = game.status === GameStatus.ACTIVE && (game.calledNumbers as number[]).length > 0;
+
       socket.emit('game:joined', {
         gameId,
         playerId: existingPlayer.id,
         ticket: existingPlayer.ticket,
         wins: playerWins, // Include player's wins for immediate sync
+        isMidGameJoin: isMidGameJoin,
+        calledNumbersCount: (game.calledNumbers as number[]).length,
       });
 
       // Fetch markedNumbers from Redis for the rejoining player
@@ -423,6 +446,8 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         playerCount: allPlayers.length, // Just send count for display
         winners: winners,
         markedNumbers: markedNumbers, // Include player's marked numbers
+        availablePrizes: availablePrizes, // Include prize availability for mid-game joins
+        isMidGameJoin: isMidGameJoin, // Flag if this is a mid-game join
       };
 
       console.log('[StateSync] Sending optimized state to rejoining player:', {
@@ -547,6 +572,10 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
           const markedNumbersStr = await redis.hget(ticketKey, 'markedNumbers');
           const markedNumbers = markedNumbersStr ? JSON.parse(markedNumbersStr) : [];
 
+          // Get available prizes for race condition rejoin
+          const availablePrizes = await gameService.getAvailablePrizes(gameId);
+          const isMidGameJoin = game.status === GameStatus.ACTIVE && (game.calledNumbers as number[]).length > 0;
+
           // Optimized state sync - send only essential data
           socket.emit('game:stateSync', {
             calledNumbers: game.calledNumbers || [],
@@ -555,6 +584,8 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
             playerCount: allPlayers.length, // Just send count
             winners: winners,
             markedNumbers: markedNumbers, // Include player's marked numbers
+            availablePrizes: availablePrizes,
+            isMidGameJoin: isMidGameJoin,
           });
 
           enhancedLogger.playerJoin(
@@ -581,11 +612,17 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
     // Increment player count in Redis
     await gameService.incrementPlayerCount(gameId);
 
+    // Get available prizes and check if mid-game join
+    const availablePrizes = await gameService.getAvailablePrizes(gameId);
+    const isMidGameJoin = game.status === GameStatus.ACTIVE && (game.calledNumbers as number[]).length > 0;
+
     // Send ticket to player
     socket.emit('game:joined', {
       gameId,
       playerId: player.id,
       ticket: player.ticket,
+      isMidGameJoin: isMidGameJoin,
+      calledNumbersCount: (game.calledNumbers as number[]).length,
     });
 
     // Broadcast to room that a player joined

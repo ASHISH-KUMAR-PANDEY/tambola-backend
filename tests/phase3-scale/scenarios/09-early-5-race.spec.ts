@@ -2,12 +2,13 @@
  * Test 9: Early 5 Win Race Condition
  *
  * Validates win claim handling when multiple players claim simultaneously:
+ * - 200 players in active game
  * - 5 players each have exactly 5 marked numbers
  * - All 5 players claim Early 5 within 100ms window
  * - Verify only first claim is accepted
  * - Verify other 4 receive rejection
  * - Verify PostgreSQL has exactly 1 Early 5 winner
- * - Verify all 50 players see correct winner broadcast
+ * - Verify all 200 players see correct winner broadcast
  */
 
 import { test, expect } from '@playwright/test';
@@ -57,12 +58,11 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
 
     await organizer.connect();
     gameId = await organizer.createGame();
-    await organizer.joinGame(gameId);
     console.log(`✅ Organizer ready, game: ${gameId}\n`);
 
-    // Step 2: Connect 50 socket players
-    console.log('Step 2: Connecting 50 socket players...');
-    for (let i = 0; i < 50; i++) {
+    // Step 2: Connect 200 socket players
+    console.log('Step 2: Connecting 200 socket players...');
+    for (let i = 0; i < 200; i++) {
       const player = new SocketPlayer({
         account: accounts.players[i],
         backendUrl: BACKEND_URL,
@@ -71,24 +71,49 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
       await player.connect();
       socketPlayers.push(player);
 
-      if ((i + 1) % 10 === 0) {
-        console.log(`  Connected: ${i + 1}/50 players`);
+      if ((i + 1) % 20 === 0) {
+        console.log(`  Connected: ${i + 1}/200 players`);
       }
     }
-    console.log('✅ All 50 players connected\n');
+    console.log('✅ All 200 players connected\n');
 
-    // Step 3: All players join game
-    console.log('Step 3: Players joining game...');
-    await Promise.all(socketPlayers.map(p => p.joinGame(gameId)));
-    console.log('✅ All 50 players joined\n');
+    // Step 3: All players join LOBBY (staggered to avoid overwhelming backend)
+    console.log('Step 3: Players joining lobby (staggered over 30 seconds)...');
+    const lobbyJoinPromises = socketPlayers.map((player, index) => {
+      const delay = Math.floor((index / 200) * 30000); // Spread over 30 seconds
+      return new Promise<void>(async (resolve) => {
+        setTimeout(async () => {
+          await player.joinLobby(gameId);
+          resolve();
+        }, delay);
+      });
+    });
+    await Promise.all(lobbyJoinPromises);
+    console.log('✅ All 200 players joined lobby\n');
 
-    // Step 4: Start game
-    console.log('Step 4: Starting game...');
+    // Step 4: Players set up listeners for game:starting BEFORE organizer starts
+    console.log('Step 4: Setting up game:starting listeners...');
+    const gameStartWaitPromises = socketPlayers.map(player => player.waitForGameStart());
+    console.log('✅ Listeners set up\n');
+
+    // Step 5: Organizer starts game
+    console.log('Step 5: Organizer starting game...');
     await organizer.startGame();
     console.log('✅ Game started\n');
 
-    // Step 5: Identify 5 players who can mark exactly 5 numbers
-    console.log('Step 5: Setting up 5 players for Early 5 race...');
+    // Step 6: Wait for all players to receive game:starting
+    console.log('Step 6: Waiting for players to receive game:starting...');
+    await Promise.all(gameStartWaitPromises);
+    console.log('✅ All players received game:starting\n');
+
+    // Step 7: Players join active game
+    console.log('Step 7: Players joining active game...');
+    const gameJoinPromises = socketPlayers.map(player => player.joinGame(gameId));
+    await Promise.all(gameJoinPromises);
+    console.log('✅ All 200 players in active game\n');
+
+    // Step 8: Identify 5 players who can mark exactly 5 numbers
+    console.log('Step 8: Setting up 5 players for Early 5 race...');
 
     // We need to call numbers strategically so 5 players can mark exactly 5 numbers
     // Strategy: Call numbers from first 5 players' tickets (5 numbers each)
@@ -117,8 +142,8 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
     }
     console.log('✅ Numbers called\n');
 
-    // Step 6: Each race player manually marks their 5 numbers
-    console.log('Step 6: Race players marking their 5 numbers...');
+    // Step 9: Each race player manually marks their 5 numbers
+    console.log('Step 9: Race players marking their 5 numbers...');
     for (let i = 0; i < racePlayers.length; i++) {
       const player = racePlayers[i];
       if (!player.ticket) continue;
@@ -138,8 +163,8 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
     }
     console.log('✅ All race players have marked 5 numbers\n');
 
-    // Step 7: All 5 players claim Early 5 SIMULTANEOUSLY
-    console.log('Step 7: 5 players claiming Early 5 simultaneously...');
+    // Step 10: All 5 players claim Early 5 SIMULTANEOUSLY
+    console.log('Step 10: 5 players claiming Early 5 simultaneously...');
 
     const claimPromises = racePlayers.map(player =>
       player.claimWin('EARLY_5').catch(err => ({
@@ -155,7 +180,7 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
       console.log(`    Player ${index + 1}: ${result.success ? '✅ ACCEPTED' : '❌ REJECTED'} - ${result.message}`);
     });
 
-    // Step 8: Validate exactly 1 success
+    // Step 11: Validate exactly 1 success
     console.log('\nValidating: Exactly 1 claim accepted...');
     const successCount = results.filter(r => r.success).length;
 
@@ -174,11 +199,11 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
       throw new Error(`Expected 4 rejections, got ${rejectionCount}`);
     }
 
-    // Step 9: Wait for winner broadcast
-    console.log('Step 9: Waiting for winner broadcast...');
+    // Step 12: Wait for winner broadcast
+    console.log('Step 12: Waiting for winner broadcast...');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Validate: All 50 players see exactly 1 Early 5 winner
+    // Validate: All 200 players see exactly 1 Early 5 winner
     console.log('Validating: All players see 1 Early 5 winner...');
     const winnersSeenByPlayers = socketPlayers.map(p => {
       const early5Winners = p.winners.filter(w => w.category === 'EARLY_5');
@@ -188,13 +213,13 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
     const allSee1Winner = winnersSeenByPlayers.every(count => count === 1);
 
     if (allSee1Winner) {
-      console.log('✅ All 50 players see exactly 1 Early 5 winner\n');
+      console.log('✅ All 200 players see exactly 1 Early 5 winner\n');
     } else {
       console.log(`❌ Winner count discrepancies: ${winnersSeenByPlayers.slice(0, 10).join(', ')}...`);
       throw new Error('Not all players see exactly 1 winner');
     }
 
-    // Step 10: Validate winner is one of the race players
+    // Step 13: Validate winner is one of the race players
     const winnerPlayerId = socketPlayers[0].winners.find(w => w.category === 'EARLY_5')?.playerId;
     const winnerIsRacePlayer = racePlayers.some(p => p.playerId === winnerPlayerId);
 
@@ -205,13 +230,13 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
       throw new Error('Winner is not one of the race players');
     }
 
-    // Step 11: Validate no duplicate winners in winners array
+    // Step 14: Validate no duplicate winners in winners array
     console.log('Validating: No duplicate Early 5 winners...');
     Validators.validateExclusiveWinner(socketPlayers, 'EARLY_5');
     console.log('✅ No duplicate winners\n');
 
-    // Step 12: Continue game to ensure no issues
-    console.log('Step 12: Continuing game (calling 10 more numbers)...');
+    // Step 15: Continue game to ensure no issues
+    console.log('Step 15: Continuing game (calling 10 more numbers)...');
     await organizer.callRandomNumbers(10, 500);
     console.log('✅ Game continues normally\n');
 
@@ -219,10 +244,11 @@ test.describe('Win Race: Early 5 Simultaneous Claims', () => {
     console.log('╔════════════════════════════════════════════════════════════╗');
     console.log('║                    TEST COMPLETE                           ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
+    console.log(`  Total players: 200`);
     console.log(`  Race players: 5`);
     console.log(`  Claims accepted: 1`);
     console.log(`  Claims rejected: 4`);
-    console.log(`  Winner broadcast: ✅ (all 50 players notified)`);
+    console.log(`  Winner broadcast: ✅ (all 200 players notified)`);
     console.log(`  No duplicate winners: ✅`);
     console.log(`  Game continues: ✅`);
     console.log(`  Status: ✅ PASSED\n`);

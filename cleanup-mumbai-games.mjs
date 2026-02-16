@@ -1,87 +1,82 @@
 #!/usr/bin/env node
 /**
- * Cleanup Script: Remove all test games created during Phase 3 testing
- *
- * This script:
- * 1. Finds all test organizers (by email/name prefix)
- * 2. Finds all games created by those organizers
- * 3. Deletes all related records (Players, GameLobbyPlayers, Winners)
- * 4. Deletes the games themselves
+ * Delete all test games from production Mumbai RDS database
  */
 
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// Production Mumbai RDS connection
+const DATABASE_URL = 'postgresql://tambolaadmin:TambolaDB2024SecurePass@tambola-postgres-mumbai.crqimwgeu0u1.ap-south-1.rds.amazonaws.com:5432/tambola_db';
 
-async function cleanupTestGames() {
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: DATABASE_URL
+    }
+  }
+});
+
+async function cleanupProductionGames() {
   console.log('\n╔════════════════════════════════════════════════════════════╗');
-  console.log('║          CLEANUP: Remove All Test Games                   ║');
+  console.log('║   CLEANUP: Delete ALL Test Games from Mumbai Production   ║');
   console.log('╚════════════════════════════════════════════════════════════╝\n');
 
   try {
-    // Step 1: Find test organizers
-    console.log('Step 1: Finding test organizers...');
-    const testOrganizers = await prisma.user.findMany({
-      where: {
-        OR: [
-          { email: { startsWith: 'test-org-' } },
-          { name: { startsWith: 'TestOrganizer' } }
-        ]
+    // Step 1: Count current games
+    console.log('Step 1: Counting games...');
+    const gameCount = await prisma.game.count();
+    console.log(`  Total games in database: ${gameCount}\n`);
+
+    if (gameCount === 0) {
+      console.log('✅ No games to delete\n');
+      return;
+    }
+
+    // Step 2: Get all games with details
+    console.log('Step 2: Fetching game details...');
+    const games = await prisma.game.findMany({
+      select: {
+        id: true,
+        status: true,
+        scheduledTime: true,
+        createdBy: true,
+        _count: {
+          select: {
+            players: true,
+            lobbyPlayers: true,
+            winners: true
+          }
+        }
       },
-      select: { id: true, name: true, email: true }
+      orderBy: { scheduledTime: 'desc' }
     });
 
-    console.log(`  Found ${testOrganizers.length} test organizers:`);
-    testOrganizers.forEach(org => {
-      console.log(`    - ${org.name} (${org.email})`);
+    console.log(`  Found ${games.length} games:\n`);
+    games.slice(0, 10).forEach((game, i) => {
+      console.log(`  ${i + 1}. ${game.id.substring(0, 8)}... - ${game.status} - ${game.scheduledTime.toISOString()} - Players: ${game._count.players}`);
     });
-
-    if (testOrganizers.length === 0) {
-      console.log('\n✅ No test organizers found. Nothing to clean up.\n');
-      return;
+    if (games.length > 10) {
+      console.log(`  ... and ${games.length - 10} more games\n`);
     }
 
-    const organizerIds = testOrganizers.map(org => org.id);
+    const gameIds = games.map(g => g.id);
 
-    // Step 2: Find test games
-    console.log('\nStep 2: Finding games created by test organizers...');
-    const testGames = await prisma.game.findMany({
-      where: { createdBy: { in: organizerIds } },
-      select: { id: true, code: true, status: true, createdAt: true }
-    });
-
-    console.log(`  Found ${testGames.length} test games to delete`);
-    if (testGames.length > 0) {
-      console.log(`  Sample games:`);
-      testGames.slice(0, 5).forEach(game => {
-        console.log(`    - Game ${game.code} (${game.status}) - ${game.createdAt}`);
-      });
-      if (testGames.length > 5) {
-        console.log(`    ... and ${testGames.length - 5} more games`);
-      }
-    }
-
-    if (testGames.length === 0) {
-      console.log('\n✅ No test games found. Nothing to clean up.\n');
-      return;
-    }
-
-    const gameIds = testGames.map(g => g.id);
-
-    // Step 3: Count related records before deletion
+    // Step 3: Count related records
     console.log('\nStep 3: Counting related records...');
     const playerCount = await prisma.player.count({ where: { gameId: { in: gameIds } } });
     const lobbyPlayerCount = await prisma.gameLobbyPlayer.count({ where: { gameId: { in: gameIds } } });
     const winnerCount = await prisma.winner.count({ where: { gameId: { in: gameIds } } });
+    const prizeQueueCount = await prisma.prizeQueue.count({ where: { gameId: { in: gameIds } } });
 
     console.log(`  Players: ${playerCount}`);
     console.log(`  Lobby Players: ${lobbyPlayerCount}`);
     console.log(`  Winners: ${winnerCount}`);
+    console.log(`  Prize Queue: ${prizeQueueCount}\n`);
 
-    // Step 4: Delete all records in a transaction
-    console.log('\nStep 4: Deleting all test data...');
+    // Step 4: Delete everything in a transaction
+    console.log('Step 4: Deleting all data...');
     await prisma.$transaction(async (tx) => {
-      // Delete in correct order (foreign key dependencies)
+      // Delete in correct order (foreign keys)
       await tx.winner.deleteMany({ where: { gameId: { in: gameIds } } });
       console.log('  ✓ Deleted winners');
 
@@ -91,6 +86,9 @@ async function cleanupTestGames() {
       await tx.gameLobbyPlayer.deleteMany({ where: { gameId: { in: gameIds } } });
       console.log('  ✓ Deleted lobby players');
 
+      await tx.prizeQueue.deleteMany({ where: { gameId: { in: gameIds } } });
+      console.log('  ✓ Deleted prize queue');
+
       await tx.game.deleteMany({ where: { id: { in: gameIds } } });
       console.log('  ✓ Deleted games');
     });
@@ -99,11 +97,11 @@ async function cleanupTestGames() {
     console.log('\n╔════════════════════════════════════════════════════════════╗');
     console.log('║                  CLEANUP COMPLETE                          ║');
     console.log('╚════════════════════════════════════════════════════════════╝\n');
-    console.log(`  Test organizers: ${testOrganizers.length}`);
-    console.log(`  Games deleted: ${testGames.length}`);
+    console.log(`  Games deleted: ${games.length}`);
     console.log(`  Players deleted: ${playerCount}`);
     console.log(`  Lobby players deleted: ${lobbyPlayerCount}`);
     console.log(`  Winners deleted: ${winnerCount}`);
+    console.log(`  Prize queue deleted: ${prizeQueueCount}`);
     console.log(`  Status: ✅ SUCCESS\n`);
 
   } catch (error) {
@@ -115,5 +113,4 @@ async function cleanupTestGames() {
   }
 }
 
-// Run cleanup
-cleanupTestGames();
+cleanupProductionGames();
