@@ -303,11 +303,13 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         winners.map(async (w) => {
           const player = await prisma.player.findUnique({
             where: { id: w.playerId },
+            select: { userName: true, userId: true },
           });
           return {
             playerId: w.playerId,
             category: w.category,
             userName: player?.userName || 'Unknown',
+            userId: player?.userId,
           };
         })
       );
@@ -375,7 +377,7 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       // Get all players in the game
       const allPlayers = await prisma.player.findMany({
         where: { gameId },
-        select: { id: true, userName: true },
+        select: { id: true, userName: true, userId: true },
       });
 
       // Get all winners
@@ -384,13 +386,14 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
         select: { playerId: true, category: true },
       });
 
-      // Map winners with userName from players
+      // Map winners with userName and userId from players
       const winners = winnersData.map((w) => {
         const player = allPlayers.find((p) => p.id === w.playerId);
         return {
           playerId: w.playerId,
           category: w.category,
           userName: player?.userName,
+          userId: player?.userId,
         };
       });
 
@@ -515,20 +518,21 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
           // Get all players and winners for state sync
           const allPlayers = await prisma.player.findMany({
             where: { gameId },
-            select: { id: true, userName: true },
+            select: { id: true, userName: true, userId: true },
           });
           const winnersData = await prisma.winner.findMany({
             where: { gameId },
             select: { playerId: true, category: true },
           });
 
-          // Map winners with userName from players
+          // Map winners with userName and userId from players
           const winners = winnersData.map((w) => {
             const player = allPlayers.find((p) => p.id === w.playerId);
             return {
               playerId: w.playerId,
               category: w.category,
               userName: player?.userName,
+              userId: player?.userId,
             };
           });
 
