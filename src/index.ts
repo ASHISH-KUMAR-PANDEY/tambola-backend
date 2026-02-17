@@ -179,31 +179,6 @@ io.on('connection', (socket) => {
     'Client connected'
   );
 
-  // Lobby event handlers
-  socket.on('lobby:join', async (payload) => {
-    try {
-      await gameHandlers.handleLobbyJoin(socket, payload);
-    } catch (error) {
-      logger.error({ error, socketId: socket.id, event: 'lobby:join' }, 'Event handler error');
-      socket.emit('error', {
-        code: 'HANDLER_ERROR',
-        message: 'Failed to process lobby:join event',
-      });
-    }
-  });
-
-  socket.on('lobby:leave', async (payload) => {
-    try {
-      await gameHandlers.handleLobbyLeave(socket, payload);
-    } catch (error) {
-      logger.error({ error, socketId: socket.id, event: 'lobby:leave' }, 'Event handler error');
-      socket.emit('error', {
-        code: 'HANDLER_ERROR',
-        message: 'Failed to process lobby:leave event',
-      });
-    }
-  });
-
   // Game event handlers with try/catch wrappers per project-context.md
   socket.on('game:join', async (payload) => {
     try {
