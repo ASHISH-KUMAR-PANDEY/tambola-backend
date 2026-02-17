@@ -634,18 +634,51 @@ export async function handleCallNumber(
 
     // Check duplicate in Redis only (faster than PostgreSQL)
     const key = `game:${gameId}:state`;
-    const calledNumbersStr = await redis.hget(key, 'calledNumbers');
+    let calledNumbersStr = await redis.hget(key, 'calledNumbers');
 
+    // If Redis state is missing, initialize from PostgreSQL
     if (!calledNumbersStr) {
-      const errorMsg = 'Game state not found';
-      socket.emit('error', {
-        code: 'GAME_STATE_NOT_FOUND',
-        message: errorMsg,
+      logger.warn({
+        gameId,
+        userId,
+        action: 'REDIS_STATE_MISSING',
+      }, 'Game state not found in Redis - initializing from PostgreSQL');
+
+      // Get game from database
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { calledNumbers: true, currentNumber: true },
       });
-      if (callback) {
-        callback({ success: false, error: errorMsg });
+
+      if (!game) {
+        const errorMsg = 'Game not found in database';
+        socket.emit('error', {
+          code: 'GAME_NOT_FOUND',
+          message: errorMsg,
+        });
+        if (callback) {
+          callback({ success: false, error: errorMsg });
+        }
+        return;
       }
-      return;
+
+      // Initialize Redis state from PostgreSQL
+      const dbCalledNumbers = (game.calledNumbers as number[]) || [];
+      await redis.hmset(key, {
+        status: 'ACTIVE',
+        calledNumbers: JSON.stringify(dbCalledNumbers),
+        currentNumber: game.currentNumber ? game.currentNumber.toString() : '',
+        wonCategories: JSON.stringify([]),
+        playerCount: '0',
+      });
+      await redis.expire(key, 7200); // 2 hours
+
+      logger.info({
+        gameId,
+        calledNumbersCount: dbCalledNumbers.length,
+      }, 'Redis state initialized from PostgreSQL');
+
+      calledNumbersStr = JSON.stringify(dbCalledNumbers);
     }
 
     const calledNumbers: number[] = JSON.parse(calledNumbersStr);
