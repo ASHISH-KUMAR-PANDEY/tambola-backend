@@ -503,51 +503,17 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       return;
     }
 
-    // Get all players from waiting lobby
-    const lobbyPlayers = await prisma.gameLobbyPlayer.findMany({
+    // Get current players (who joined via game:join during LOBBY status)
+    const existingPlayers = await prisma.player.findMany({
       where: { gameId },
       select: { userId: true, userName: true },
     });
 
-    if (lobbyPlayers.length === 0) {
-      socket.emit('error', {
-        code: 'NO_PLAYERS',
-        message: 'Cannot start game with no players in waiting lobby',
-      });
-      return;
-    }
-
-    // Generate tickets for all lobby players and create Player records
-    // Use a transaction to ensure all Player records are created atomically
-    // This prevents race condition where players try to join before their record exists
-    const createdPlayers = await prisma.$transaction(async (tx) => {
-      const players = await Promise.all(
-        lobbyPlayers.map(async (lobbyPlayer) => {
-          const ticket = generateTicket();
-          return tx.player.create({
-            data: {
-              gameId,
-              userId: lobbyPlayer.userId,
-              userName: lobbyPlayer.userName,
-              ticket,
-            },
-          });
-        })
-      );
-
-      // Clear lobby players within the same transaction
-      await tx.gameLobbyPlayer.deleteMany({
-        where: { gameId },
-      });
-
-      return players;
-    });
-
     logger.info({
       gameId,
-      playerCount: createdPlayers.length,
-      userIds: createdPlayers.map(p => p.userId),
-    }, 'All Player records created successfully in transaction');
+      playerCount: existingPlayers.length,
+      userIds: existingPlayers.map(p => p.userId),
+    }, 'Starting game with existing players (mid-game join allowed)');
 
     // Initialize game state in Redis
     await gameService.initializeGameState(gameId);
@@ -561,10 +527,8 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       status: GameStatus.ACTIVE,
     });
 
-    // Broadcast to all players in lobby room
+    // Broadcast to all players in game room
     const io = getIO();
-    io.in(`lobby:${gameId}`).emit('game:starting', { gameId });
-    // Also broadcast to game room (in case anyone is already there)
     io.in(`game:${gameId}`).emit('game:starting', { gameId });
     // Direct emit to organizer
     socket.emit('game:starting', { gameId });
@@ -575,11 +539,11 @@ export async function handleGameStart(socket: Socket, payload: unknown): Promise
       action: 'GAME_STARTED',
       gameId,
       organizerId: userId,
-      playerCount: createdPlayers.length,
+      playerCount: existingPlayers.length,
       socketId: socket.id,
       timestamp: new Date().toISOString(),
       scheduledTime: game.scheduledTime,
-    }, `Game started with ${createdPlayers.length} players from waiting lobby`);
+    }, `Game started with ${existingPlayers.length} players (mid-game join enabled)`);
   } catch (error) {
     logger.error({ error, socketId: socket.id }, 'game:start handler error');
     socket.emit('error', {
