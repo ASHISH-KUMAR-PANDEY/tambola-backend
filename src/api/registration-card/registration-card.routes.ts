@@ -28,4 +28,11 @@ export async function registrationCardRoutes(
     { preHandler: [authMiddleware] },
     controller.deleteRegistrationCard
   );
+
+  // Reset all reminders for a registration card (organizer only)
+  fastify.post(
+    '/:id/reset-reminders',
+    { preHandler: [authMiddleware] },
+    controller.resetAllReminders
+  );
 }

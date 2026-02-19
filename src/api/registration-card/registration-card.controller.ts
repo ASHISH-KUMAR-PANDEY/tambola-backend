@@ -64,6 +64,7 @@ export async function createRegistrationCard(
       message: card.message,
       targetDateTime: card.targetDateTime,
       isActive: card.isActive,
+      lastResetAt: card.lastResetAt,
       createdAt: card.createdAt,
     });
   } catch (error) {
@@ -101,6 +102,7 @@ export async function getActiveRegistrationCard(
         message: card.message,
         targetDateTime: card.targetDateTime,
         isActive: card.isActive,
+        lastResetAt: card.lastResetAt,
         createdAt: card.createdAt,
       },
     });
@@ -160,6 +162,7 @@ export async function updateRegistrationCard(
       message: card.message,
       targetDateTime: card.targetDateTime,
       isActive: card.isActive,
+      lastResetAt: card.lastResetAt,
       updatedAt: card.updatedAt,
     });
   } catch (error) {
@@ -213,6 +216,56 @@ export async function deleteRegistrationCard(
     throw new AppError(
       'DELETE_CARD_FAILED',
       'Failed to delete registration card',
+      500
+    );
+  }
+}
+
+export async function resetAllReminders(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { id } = request.params as { id: string };
+
+    if (!id) {
+      throw new AppError('MISSING_ID', 'Card ID is required', 400);
+    }
+
+    // Check if card exists
+    const existingCard = await prisma.registrationCard.findUnique({
+      where: { id },
+    });
+
+    if (!existingCard) {
+      throw new AppError('CARD_NOT_FOUND', 'Registration card not found', 404);
+    }
+
+    // Update lastResetAt to current timestamp
+    const card = await prisma.registrationCard.update({
+      where: { id },
+      data: { lastResetAt: new Date() },
+    });
+
+    logger.info({ cardId: card.id }, 'All reminders reset for registration card');
+
+    await reply.send({
+      id: card.id,
+      message: card.message,
+      targetDateTime: card.targetDateTime,
+      isActive: card.isActive,
+      lastResetAt: card.lastResetAt,
+      updatedAt: card.updatedAt,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    logger.error({ error }, 'Failed to reset reminders');
+    throw new AppError(
+      'RESET_REMINDERS_FAILED',
+      'Failed to reset reminders',
       500
     );
   }
