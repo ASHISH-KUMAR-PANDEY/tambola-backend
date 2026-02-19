@@ -420,6 +420,37 @@ export async function handleGameJoin(socket: Socket, payload: unknown): Promise<
       calledNumbersCount: (game.calledNumbers as number[]).length,
     });
 
+    // Send state sync to the joining player (includes calledNumbers for organizer display)
+    const allPlayers = await prisma.player.findMany({
+      where: { gameId },
+      select: { id: true, userId: true, userName: true },
+    });
+
+    const winners = await prisma.winner.findMany({
+      where: { gameId },
+      select: { playerId: true, category: true },
+    });
+
+    const winnersWithNames = winners.map((w) => {
+      const winnerPlayer = allPlayers.find((p) => p.id === w.playerId);
+      return {
+        playerId: w.playerId,
+        category: w.category,
+        userName: winnerPlayer?.userName,
+        userId: winnerPlayer?.userId,
+      };
+    });
+
+    socket.emit('game:stateSync', {
+      calledNumbers: game.calledNumbers || [],
+      currentNumber: game.currentNumber,
+      players: allPlayers.map(p => ({ playerId: p.id, userName: p.userName })),
+      playerCount: allPlayers.length,
+      winners: winnersWithNames,
+      availablePrizes: availablePrizes,
+      isMidGameJoin: isMidGameJoin,
+    });
+
     // Broadcast to room that a player joined
     const broadcastStart = Date.now();
     socket.to(`game:${gameId}`).emit('game:playerJoined', {
