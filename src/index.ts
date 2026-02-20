@@ -87,6 +87,21 @@ fastify.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
+// Flutter Bridge debug endpoint
+fastify.post('/api/debug/flutter-bridge', async (request, reply) => {
+  const body = request.body as any;
+  logger.info({
+    flutterBridge: true,
+    event: body.event,
+    data: body.data,
+    userAgent: body.userAgent,
+    url: body.url,
+    windowKeys: body.windowKeys,
+    timestamp: body.timestamp,
+  }, `[FlutterBridge] ${body.event}`);
+  return { success: true };
+});
+
 // API routes
 import { authRoutes } from './api/auth/auth.routes.js';
 import { gamesRoutes } from './api/games/games.routes.js';
