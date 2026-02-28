@@ -178,3 +178,27 @@ export async function isUserVIP(userId: string): Promise<boolean> {
     return true;
   }
 }
+
+/**
+ * Check if current authenticated user is VIP
+ * API endpoint for frontend to check VIP status
+ */
+export async function checkVIPStatus(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const authReq = request as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+
+    const isVIP = await isUserVIP(userId);
+
+    logger.info({ userId, isVIP }, 'VIP status checked');
+
+    reply.send({ isVIP });
+  } catch (error) {
+    logger.error({ error }, 'Failed to check VIP status');
+    // Fail open - return true on errors
+    reply.send({ isVIP: true });
+  }
+}

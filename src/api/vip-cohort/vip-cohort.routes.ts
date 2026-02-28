@@ -5,6 +5,13 @@ import * as controller from './vip-cohort.controller.js';
 export async function vipCohortRoutes(
   fastify: FastifyInstance
 ): Promise<void> {
+  // Check if current user is VIP
+  fastify.get(
+    '/check',
+    { preHandler: [authMiddleware] },
+    controller.checkVIPStatus
+  );
+
   // Upload/Replace VIP list (organizer only)
   fastify.post(
     '/upload',
