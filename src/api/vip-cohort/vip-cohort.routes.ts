@@ -5,10 +5,9 @@ import * as controller from './vip-cohort.controller.js';
 export async function vipCohortRoutes(
   fastify: FastifyInstance
 ): Promise<void> {
-  // Check if current user is VIP
+  // Check if user is VIP (no auth required - accepts userId as query param)
   fastify.get(
     '/check',
-    { preHandler: [authMiddleware] },
     controller.checkVIPStatus
   );
 
