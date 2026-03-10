@@ -272,17 +272,18 @@ io.on('connection', (socket) => {
   });
 
   // Wheel spin event - broadcasts to all clients in game room (including /wheel display)
-  socket.on('wheel:spin', async (payload: { gameId: string; targetNumber: number; spinDuration: number; remainingNumbers: number[] }) => {
+  socket.on('wheel:spin', async (payload: { gameId: string; targetNumber: number; spinDuration: number; remainingNumbers: number[]; rotation: number }) => {
     try {
-      const { gameId, targetNumber, spinDuration, remainingNumbers } = payload;
-      logger.info({ gameId, targetNumber, spinDuration, remainingCount: remainingNumbers?.length, socketId: socket.id }, 'Wheel spin event');
+      const { gameId, targetNumber, spinDuration, remainingNumbers, rotation } = payload;
+      logger.info({ gameId, targetNumber, spinDuration, remainingCount: remainingNumbers?.length, rotation, socketId: socket.id }, 'Wheel spin event');
 
-      // Broadcast to all clients in the game room with remainingNumbers for sync
+      // Broadcast to all clients in the game room with rotation for exact sync
       io.to(`game:${gameId}`).emit('wheel:spin', {
         gameId,
         targetNumber,
         spinDuration,
         remainingNumbers,
+        rotation,
       });
     } catch (error) {
       logger.error({ error, socketId: socket.id, event: 'wheel:spin' }, 'Wheel spin error');
