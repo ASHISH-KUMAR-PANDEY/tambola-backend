@@ -271,6 +271,56 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Wheel spin event - broadcasts to all clients in game room (including /wheel display)
+  socket.on('wheel:spin', async (payload: { gameId: string; targetNumber: number; spinDuration: number }) => {
+    try {
+      const { gameId, targetNumber, spinDuration } = payload;
+      logger.info({ gameId, targetNumber, spinDuration, socketId: socket.id }, 'Wheel spin event');
+
+      // Broadcast to all clients in the game room
+      io.to(`game:${gameId}`).emit('wheel:spin', {
+        gameId,
+        targetNumber,
+        spinDuration,
+      });
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'wheel:spin' }, 'Wheel spin error');
+    }
+  });
+
+  // Wheel sync request - for /wheel display page to get current state
+  socket.on('wheel:requestSync', async (payload: { gameId: string }) => {
+    try {
+      const { gameId } = payload;
+      logger.info({ gameId, socketId: socket.id }, 'Wheel sync request');
+
+      // Get game state
+      const game = await prisma.game.findUnique({
+        where: { id: gameId },
+        select: { calledNumbers: true },
+      });
+
+      if (!game) {
+        socket.emit('error', { code: 'GAME_NOT_FOUND', message: 'Game not found' });
+        return;
+      }
+
+      const calledNumbers = (game.calledNumbers as number[]) || [];
+      const remainingNumbers = Array.from({ length: 90 }, (_, i) => i + 1).filter(
+        (n) => !calledNumbers.includes(n)
+      );
+
+      // Send sync data to requesting client
+      socket.emit('wheel:sync', {
+        gameId,
+        calledNumbers,
+        remainingNumbers,
+      });
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'wheel:requestSync' }, 'Wheel sync error');
+    }
+  });
+
   socket.on('disconnect', async (reason) => {
     const userId = socket.data.userId as string;
 
