@@ -1,18 +1,25 @@
 import { z } from 'zod';
 
+export const startGameSchema = z.object({
+  userId: z.string().min(1),
+});
+
 export const claimSchema = z.object({
+  userId: z.string().min(1),
   soloGameId: z.string().uuid(),
   category: z.enum(['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE']),
   currentNumberIndex: z.number().int().min(0).max(89),
 });
 
 export const updateProgressSchema = z.object({
+  userId: z.string().min(1),
   soloGameId: z.string().uuid(),
   currentIndex: z.number().int().min(0).max(90),
   markedNumbers: z.array(z.number().int().min(1).max(90)),
 });
 
 export const completeGameSchema = z.object({
+  userId: z.string().min(1),
   soloGameId: z.string().uuid(),
   markedNumbers: z.array(z.number().int().min(1).max(90)),
 });

@@ -7,14 +7,14 @@ export async function soloRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/current-week', { onRequest: optionalAuthMiddleware }, soloController.getCurrentWeek);
   fastify.get('/leaderboard', soloController.getLeaderboard);
 
-  // Protected routes (require auth)
-  fastify.post('/start-game', { onRequest: authMiddleware }, soloController.startGame);
-  fastify.post('/claim', { onRequest: authMiddleware }, soloController.claimCategory);
-  fastify.get('/my-game', { onRequest: authMiddleware }, soloController.getMyGame);
-  fastify.patch('/update-progress', { onRequest: authMiddleware }, soloController.updateProgress);
-  fastify.post('/complete-game', { onRequest: authMiddleware }, soloController.completeGameEndpoint);
+  // Player routes (userId via query/body, same as main game)
+  fastify.post('/start-game', soloController.startGame);
+  fastify.post('/claim', soloController.claimCategory);
+  fastify.get('/my-game', soloController.getMyGame);
+  fastify.patch('/update-progress', soloController.updateProgress);
+  fastify.post('/complete-game', soloController.completeGameEndpoint);
 
-  // Admin/Organizer routes
+  // Admin/Organizer routes (require JWT auth)
   fastify.post('/finalize-week', { onRequest: authMiddleware }, soloController.finalizeWeekEndpoint);
   fastify.post('/configure-week', { onRequest: authMiddleware }, soloController.configureWeek);
   fastify.get('/week-config', { onRequest: authMiddleware }, soloController.getWeekConfig);
