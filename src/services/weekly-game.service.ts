@@ -90,6 +90,42 @@ export async function revealNextNumber(gameId: string): Promise<number | null> {
 }
 
 /**
+ * Reveals multiple numbers at once (for daily 15-number reveal)
+ */
+export async function revealDailyNumbers(gameId: string, count: number): Promise<number[]> {
+  const game = await prisma.game.findUnique({
+    where: { id: gameId },
+    select: { numberSequence: true, revealedCount: true, status: true, gameMode: true },
+  });
+
+  if (!game || game.gameMode !== GameMode.WEEKLY || game.status !== GameStatus.ACTIVE) {
+    return [];
+  }
+
+  const remaining = game.numberSequence.length - game.revealedCount;
+  const toReveal = Math.min(count, remaining);
+  if (toReveal <= 0) return [];
+
+  const newRevealedCount = game.revealedCount + toReveal;
+  const revealedNumbers = game.numberSequence.slice(0, newRevealedCount);
+  const newNumbers = game.numberSequence.slice(game.revealedCount, newRevealedCount);
+  const lastNumber = revealedNumbers[revealedNumbers.length - 1];
+
+  await prisma.game.update({
+    where: { id: gameId },
+    data: {
+      revealedCount: newRevealedCount,
+      calledNumbers: revealedNumbers,
+      currentNumber: lastNumber,
+      lastRevealedAt: new Date(),
+    },
+  });
+
+  logger.info({ gameId, count: toReveal, totalRevealed: newRevealedCount }, 'Daily numbers revealed');
+  return newNumbers;
+}
+
+/**
  * Join a weekly game — creates a Player record with a ticket
  */
 export async function joinWeeklyGame(gameId: string, userId: string, userName: string) {
@@ -187,6 +223,11 @@ export async function getWeeklyPlayerState(gameId: string, userId: string) {
     select: { category: true, playerId: true },
   });
 
+  // Calculate today's numbers (the most recent batch of 15)
+  // If 45 revealed: today = index 30-44 (last 15)
+  const todayStartIdx = Math.max(0, game.revealedCount - 15);
+  const todayNumbers = game.numberSequence.slice(todayStartIdx, game.revealedCount);
+
   return {
     game: {
       id: game.id,
@@ -205,6 +246,7 @@ export async function getWeeklyPlayerState(gameId: string, userId: string) {
       missedNumbers,
     },
     revealedNumbers,
+    todayNumbers,
     currentNumber: revealedNumbers.length > 0 ? revealedNumbers[revealedNumbers.length - 1] : null,
     claims: claims.map((c) => ({ category: c.category, completedAtCall: c.completedAtCall, claimedAt: c.claimedAt })),
     wonCategories: [...new Set(allClaims.map((c) => c.category))],
