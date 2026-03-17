@@ -39,6 +39,11 @@ enum UserRole {
   ORGANIZER
 }
 
+enum GameMode {
+  LIVE
+  WEEKLY
+}
+
 // Models
 model User {
   id           String   @id @default(uuid())
@@ -56,25 +61,33 @@ model User {
 }
 
 model Game {
-  id            String             @id @default(uuid())
-  scheduledTime DateTime
-  startedAt     DateTime?
-  endedAt       DateTime?
-  status        GameStatus         @default(LOBBY)
-  createdBy     String
-  prizes        Json
-  calledNumbers Int[]              @default([])
-  currentNumber Int?
-  isPublic      Boolean            @default(true) // All games are open to all users by default
-  lobbyPlayers  GameLobbyPlayer[]  // Players in waiting lobby
-  players       Player[]           // Players with tickets (after game starts)
-  winners       Winner[]
-  prizeQueue    PrizeQueue[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id              String             @id @default(uuid())
+  scheduledTime   DateTime
+  startedAt       DateTime?
+  endedAt         DateTime?
+  status          GameStatus         @default(LOBBY)
+  createdBy       String
+  prizes          Json
+  calledNumbers   Int[]              @default([])
+  currentNumber   Int?
+  isPublic        Boolean            @default(true)
+  gameMode        GameMode           @default(LIVE)
+  numberSequence  Int[]              @default([])   // Pre-generated 1-90 order for WEEKLY
+  revealedCount   Int                @default(0)    // How many numbers revealed so far
+  revealIntervalMin Int?                             // Minutes between reveals (e.g., 120)
+  lastRevealedAt  DateTime?                          // When last number was revealed
+  resultDate      DateTime?                          // When results will be announced (Sunday)
+  lobbyPlayers    GameLobbyPlayer[]
+  players         Player[]
+  winners         Winner[]
+  prizeQueue      PrizeQueue[]
+  weeklyClaims    WeeklyPlayerState[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   @@index([scheduledTime, status])
   @@index([createdBy])
+  @@index([gameMode, status])
 }
 
 model GameLobbyPlayer {
@@ -90,14 +103,16 @@ model GameLobbyPlayer {
 }
 
 model Player {
-  id        String   @id @default(uuid())
-  gameId    String
-  userId    String
-  userName  String
-  ticket    Json     // Store full 3x9 grid structure as JSON
-  joinedAt  DateTime @default(now())
-  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  winners   Winner[]
+  id                 String               @id @default(uuid())
+  gameId             String
+  userId             String
+  userName           String
+  ticket             Json
+  joinedAt           DateTime             @default(now())
+  game               Game                 @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  winners            Winner[]
+  weeklyClaims       WeeklyPlayerState[]
+  weeklyMarkedNumbers WeeklyMarkedNumber[]
 
   @@unique([gameId, userId])
   @@index([gameId, userId])
@@ -196,4 +211,32 @@ model RegistrationCard {
   updatedAt      DateTime @updatedAt
 
   @@index([isActive])
+}
+
+// Weekly game: tracks when a player's pattern completed and when they claimed
+model WeeklyPlayerState {
+  id              String      @id @default(uuid())
+  gameId          String
+  playerId        String
+  category        WinCategory
+  completedAtCall Int         // At which revealed number index the pattern completed
+  claimedAt       DateTime    @default(now()) // Server-side timestamp (NOT device time)
+  game            Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player          Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, playerId, category])
+  @@index([gameId, category, completedAtCall])
+}
+
+// Weekly game: tracks which numbers a player has marked (persisted in DB, not Redis)
+model WeeklyMarkedNumber {
+  id        String   @id @default(uuid())
+  gameId    String
+  playerId  String
+  number    Int
+  markedAt  DateTime @default(now())
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, playerId, number])
+  @@index([gameId, playerId])
 }
