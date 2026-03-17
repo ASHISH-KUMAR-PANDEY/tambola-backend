@@ -110,6 +110,7 @@ import { youTubeEmbedRoutes } from './api/youtube-embed/youtube-embed.routes.js'
 import { youtubeLivestreamRoutes } from './api/youtube-livestream/youtube-livestream.routes.js';
 import { registrationCardRoutes } from './api/registration-card/registration-card.routes.js';
 import { vipCohortRoutes } from './api/vip-cohort/vip-cohort.routes.js';
+import { soloRoutes } from './api/solo/solo.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
@@ -118,6 +119,7 @@ await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
 await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-livestream' });
 await fastify.register(vipCohortRoutes, { prefix: '/api/v1/vip-cohort' });
 await fastify.register(registrationCardRoutes, { prefix: '/api/v1/registration-card' });
+await fastify.register(soloRoutes, { prefix: '/api/v1/solo' });
 
 // Socket.IO setup
 const io = new SocketIOServer(fastify.server, {
