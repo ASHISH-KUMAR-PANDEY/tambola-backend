@@ -17,8 +17,16 @@ import {
   extractYouTubeVideoId,
   finalizeWeek as finalizeWeekService,
 } from '../../services/solo-week.service.js';
-import { startGameSchema, claimSchema, updateProgressSchema, completeGameSchema, configureWeekSchema } from './solo.schema.js';
+import { claimSchema, updateProgressSchema, completeGameSchema, configureWeekSchema } from './solo.schema.js';
 import { AppError } from '../../utils/error.js';
+
+function getUserId(request: FastifyRequest): string {
+  const { userId } = request.query as { userId?: string };
+  if (!userId) {
+    throw new AppError('VALIDATION_ERROR', 'userId query parameter is required', 400);
+  }
+  return userId;
+}
 
 /**
  * GET /api/v1/solo/current-week
@@ -73,19 +81,11 @@ export async function getCurrentWeek(request: FastifyRequest, reply: FastifyRepl
 }
 
 /**
- * POST /api/v1/solo/start-game
- * Starts a new solo game. userId passed in body.
+ * POST /api/v1/solo/start-game?userId=xxx
  */
 export async function startGame(request: FastifyRequest, reply: FastifyReply) {
-  const parsed = startGameSchema.safeParse(request.body);
-  if (!parsed.success) {
-    throw new AppError('VALIDATION_ERROR', parsed.error.message, 400);
-  }
-  const { userId } = parsed.data;
-
+  const userId = getUserId(request);
   const game = await startSoloGame(userId);
-
-  // game.week is included from the startSoloGame query
   const week = (game as any).week;
 
   return reply.status(201).send({
@@ -101,17 +101,17 @@ export async function startGame(request: FastifyRequest, reply: FastifyReply) {
 }
 
 /**
- * POST /api/v1/solo/claim
- * Claims a win category in the solo game. userId passed in body.
+ * POST /api/v1/solo/claim?userId=xxx
  */
 export async function claimCategory(request: FastifyRequest, reply: FastifyReply) {
+  const userId = getUserId(request);
   const parsed = claimSchema.safeParse(request.body);
 
   if (!parsed.success) {
     throw new AppError('VALIDATION_ERROR', parsed.error.message, 400);
   }
 
-  const { userId, soloGameId, category, currentNumberIndex } = parsed.data;
+  const { soloGameId, category, currentNumberIndex } = parsed.data;
   const { claim, gameComplete } = await validateAndRecordClaim(
     soloGameId,
     userId,
@@ -131,15 +131,10 @@ export async function claimCategory(request: FastifyRequest, reply: FastifyReply
 }
 
 /**
- * GET /api/v1/solo/my-game
- * Gets the user's current week game for resume or completed view. userId via query param.
+ * GET /api/v1/solo/my-game?userId=xxx
  */
 export async function getMyGame(request: FastifyRequest, reply: FastifyReply) {
-  const { userId } = request.query as { userId: string };
-  if (!userId) {
-    throw new AppError('VALIDATION_ERROR', 'userId query parameter is required', 400);
-  }
-
+  const userId = getUserId(request);
   const { game, week } = await getUserCurrentWeekGame(userId);
 
   if (!game) {
@@ -190,34 +185,34 @@ export async function getMyGame(request: FastifyRequest, reply: FastifyReply) {
 }
 
 /**
- * PATCH /api/v1/solo/update-progress
- * Saves auto-caller position + markedNumbers for resume. userId in body.
+ * PATCH /api/v1/solo/update-progress?userId=xxx
  */
 export async function updateProgress(request: FastifyRequest, reply: FastifyReply) {
+  const userId = getUserId(request);
   const parsed = updateProgressSchema.safeParse(request.body);
 
   if (!parsed.success) {
     throw new AppError('VALIDATION_ERROR', parsed.error.message, 400);
   }
 
-  const { userId, soloGameId, currentIndex, markedNumbers } = parsed.data;
+  const { soloGameId, currentIndex, markedNumbers } = parsed.data;
   await updateGameProgress(soloGameId, userId, currentIndex, markedNumbers);
 
   return reply.send({ success: true });
 }
 
 /**
- * POST /api/v1/solo/complete-game
- * Marks the game as completed. userId in body.
+ * POST /api/v1/solo/complete-game?userId=xxx
  */
 export async function completeGameEndpoint(request: FastifyRequest, reply: FastifyReply) {
+  const userId = getUserId(request);
   const parsed = completeGameSchema.safeParse(request.body);
 
   if (!parsed.success) {
     throw new AppError('VALIDATION_ERROR', parsed.error.message, 400);
   }
 
-  const { userId, soloGameId, markedNumbers } = parsed.data;
+  const { soloGameId, markedNumbers } = parsed.data;
   await completeGame(soloGameId, userId, markedNumbers);
 
   return reply.send({ success: true });
