@@ -6,6 +6,7 @@ export async function soloRoutes(fastify: FastifyInstance): Promise<void> {
   // Public (auth-aware for personalization)
   fastify.get('/current-week', { onRequest: optionalAuthMiddleware }, soloController.getCurrentWeek);
   fastify.get('/leaderboard', soloController.getLeaderboard);
+  fastify.get('/category-rankings', soloController.getCategoryRankings);
 
   // Player routes (userId via query/body, same as main game)
   fastify.post('/start-game', soloController.startGame);

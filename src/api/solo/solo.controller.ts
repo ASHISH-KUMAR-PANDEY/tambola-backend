@@ -311,6 +311,88 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
 }
 
 /**
+ * GET /api/v1/solo/category-rankings?userId=xxx&weekId=xxx
+ * Returns top 10 claimers per category + requesting user's rank.
+ */
+export async function getCategoryRankings(request: FastifyRequest, reply: FastifyReply) {
+  const userId = getUserId(request);
+  const { weekId } = (request.query as any) || {};
+
+  let week;
+  if (weekId) {
+    week = await prisma.soloWeek.findUnique({ where: { id: weekId } });
+    if (!week) throw new AppError('WEEK_NOT_FOUND', 'Week not found', 404);
+  } else {
+    week = await getOrCreateCurrentWeek();
+  }
+
+  const categories = ['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE'] as const;
+  const rankings: Record<string, any[]> = {};
+  const userRanks: Record<string, number | null> = {};
+  const totalClaimers: Record<string, number> = {};
+
+  for (const category of categories) {
+    // Get all claims for this category this week, ordered by best first
+    const allClaims = await prisma.soloClaim.findMany({
+      where: {
+        category,
+        soloGame: { weekId: week.id },
+      },
+      orderBy: [
+        { numberCountAtClaim: 'asc' },
+        { claimedAt: 'asc' },
+      ],
+      include: {
+        soloGame: { select: { userId: true } },
+      },
+    });
+
+    totalClaimers[category] = allClaims.length;
+
+    // Find user's rank
+    const userIndex = allClaims.findIndex(c => c.soloGame.userId === userId);
+    userRanks[category] = userIndex >= 0 ? userIndex + 1 : null;
+
+    // Get top 10 with user names
+    const top10 = allClaims.slice(0, 10);
+    const rankedEntries = [];
+
+    for (let i = 0; i < top10.length; i++) {
+      const claim = top10[i];
+      const user = await prisma.user.findUnique({
+        where: { id: claim.soloGame.userId },
+        select: { name: true },
+      });
+      rankedEntries.push({
+        rank: i + 1,
+        userName: user?.name || 'Anonymous',
+        numberCountAtClaim: claim.numberCountAtClaim,
+        isCurrentUser: claim.soloGame.userId === userId,
+      });
+    }
+
+    // If user is outside top 10, add their entry separately
+    if (userIndex >= 10) {
+      const userClaim = allClaims[userIndex];
+      const user = await prisma.user.findUnique({
+        where: { id: userClaim.soloGame.userId },
+        select: { name: true },
+      });
+      rankedEntries.push({
+        rank: userIndex + 1,
+        userName: user?.name || 'Anonymous',
+        numberCountAtClaim: userClaim.numberCountAtClaim,
+        isCurrentUser: true,
+      });
+    }
+
+    rankings[category] = rankedEntries;
+  }
+
+  return reply.send({ rankings, userRanks, totalClaimers });
+}
+
+/**
  * POST /api/v1/solo/finalize-week
  * Admin: finalize weekly winners.
  */
