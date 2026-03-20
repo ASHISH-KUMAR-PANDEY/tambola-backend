@@ -19,5 +19,5 @@ export async function soloRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/finalize-week', { onRequest: authMiddleware }, soloController.finalizeWeekEndpoint);
   fastify.post('/configure-week', { onRequest: authMiddleware }, soloController.configureWeek);
   fastify.get('/week-config', { onRequest: authMiddleware }, soloController.getWeekConfig);
-  fastify.post('/admin/unlock-game2', { onRequest: authMiddleware }, soloController.adminUnlockGame2);
+  fastify.post('/admin/unlock-game2', soloController.adminUnlockGame2);
 }
