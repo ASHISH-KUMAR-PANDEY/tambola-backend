@@ -616,3 +616,36 @@ export async function getWeekConfig(request: FastifyRequest, reply: FastifyReply
     canReconfigureGame2: game2Count === 0,
   });
 }
+
+/**
+ * Admin endpoint to force-unlock Game 2 for a user by backdating Game 1 completedAt.
+ * POST /api/v1/solo/admin/unlock-game2
+ * Body: { userId: string }
+ */
+export async function adminUnlockGame2(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {
+  const { userId } = request.body as { userId: string };
+  if (!userId) {
+    return reply.status(400).send({ error: 'userId is required' });
+  }
+
+  const game1 = await prisma.soloGame.findFirst({
+    where: { userId, gameNumber: 1, status: 'COMPLETED' },
+    orderBy: { completedAt: 'desc' },
+  });
+
+  if (!game1) {
+    return reply.status(404).send({ error: 'No completed Game 1 found for this user' });
+  }
+
+  const updated = await prisma.soloGame.update({
+    where: { id: game1.id },
+    data: { completedAt: new Date(Date.now() - 25 * 60 * 60 * 1000) },
+  });
+
+  return reply.send({
+    success: true,
+    message: `Game 1 completedAt backdated to 25 hours ago for user ${userId}`,
+    gameId: updated.id,
+    newCompletedAt: updated.completedAt,
+  });
+}
