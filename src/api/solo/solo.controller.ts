@@ -622,7 +622,7 @@ export async function getWeekConfig(request: FastifyRequest, reply: FastifyReply
  * POST /api/v1/solo/admin/unlock-game2
  * Body: { userId: string }
  */
-export async function adminUnlockGame2(request: AuthenticatedRequest, reply: FastifyReply): Promise<void> {
+export async function adminUnlockGame2(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { userId } = request.body as { userId: string };
   if (!userId) {
     return reply.status(400).send({ error: 'userId is required' });
