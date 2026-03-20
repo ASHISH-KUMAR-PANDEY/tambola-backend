@@ -95,48 +95,57 @@ export async function finalizeWeek(weekId: string): Promise<void> {
 
   const categories: WinCategory[] = ['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE'];
 
-  for (const category of categories) {
-    // Find the best claim for this category across all games in this week
-    const bestClaim = await prisma.soloClaim.findFirst({
-      where: {
-        category,
-        soloGame: { weekId },
-      },
-      orderBy: [
-        { numberCountAtClaim: 'asc' },
-        { claimedAt: 'asc' },
-      ],
-      include: {
-        soloGame: true,
-      },
-    });
+  // Determine which game numbers to finalize (1 always, 2 only if configured)
+  const gameNumbers = [1];
+  if (isGame2Configured(week)) {
+    gameNumbers.push(2);
+  }
 
-    if (bestClaim) {
-      // Get user name
-      const user = await prisma.user.findUnique({
-        where: { id: bestClaim.soloGame.userId },
-        select: { name: true },
-      });
-
-      await prisma.soloWeeklyWinner.upsert({
+  for (const gameNumber of gameNumbers) {
+    for (const category of categories) {
+      // Find the best claim for this category across games with this gameNumber
+      const bestClaim = await prisma.soloClaim.findFirst({
         where: {
-          weekId_category: { weekId, category },
-        },
-        update: {
-          userId: bestClaim.soloGame.userId,
-          userName: user?.name || null,
-          numberCountAtClaim: bestClaim.numberCountAtClaim,
-          claimedAt: bestClaim.claimedAt,
-        },
-        create: {
-          weekId,
           category,
-          userId: bestClaim.soloGame.userId,
-          userName: user?.name || null,
-          numberCountAtClaim: bestClaim.numberCountAtClaim,
-          claimedAt: bestClaim.claimedAt,
+          soloGame: { weekId, gameNumber },
+        },
+        orderBy: [
+          { numberCountAtClaim: 'asc' },
+          { claimedAt: 'asc' },
+        ],
+        include: {
+          soloGame: true,
         },
       });
+
+      if (bestClaim) {
+        // Get user name
+        const user = await prisma.user.findUnique({
+          where: { id: bestClaim.soloGame.userId },
+          select: { name: true },
+        });
+
+        await prisma.soloWeeklyWinner.upsert({
+          where: {
+            weekId_category_gameNumber: { weekId, category, gameNumber },
+          },
+          update: {
+            userId: bestClaim.soloGame.userId,
+            userName: user?.name || null,
+            numberCountAtClaim: bestClaim.numberCountAtClaim,
+            claimedAt: bestClaim.claimedAt,
+          },
+          create: {
+            weekId,
+            category,
+            gameNumber,
+            userId: bestClaim.soloGame.userId,
+            userName: user?.name || null,
+            numberCountAtClaim: bestClaim.numberCountAtClaim,
+            claimedAt: bestClaim.claimedAt,
+          },
+        });
+      }
     }
   }
 
@@ -163,10 +172,17 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Checks if a week has been configured with video data.
+ * Checks if a week has been configured with video data (Game 1).
  */
 export function isWeekConfigured(week: SoloWeek): boolean {
   return !!(week.videoUrl && week.numberSequence.length === 90 && week.numberTimestamps.length === 90);
+}
+
+/**
+ * Checks if Game 2 has been configured for the week.
+ */
+export function isGame2Configured(week: SoloWeek): boolean {
+  return !!(week.game2VideoUrl && week.game2NumberSequence.length === 90 && week.game2NumberTimestamps.length === 90);
 }
 
 /**
@@ -226,5 +242,63 @@ export async function configureSoloWeekVideo(
   });
 
   logger.info({ weekId, videoUrl: config.videoUrl }, 'Solo week video configured');
+  return updated;
+}
+
+/**
+ * Configures Game 2 video-based number calling for a week.
+ * Same validation as Game 1 but writes to game2_ fields.
+ */
+export async function configureSoloWeekGame2Video(
+  weekId: string,
+  config: {
+    videoUrl: string;
+    videoId: string;
+    numberSequence: number[];
+    numberTimestamps: number[];
+    configuredBy: string;
+  }
+) {
+  const week = await prisma.soloWeek.findUnique({ where: { id: weekId } });
+  if (!week) throw new AppError('WEEK_NOT_FOUND', 'Week not found', 404);
+
+  // Validate numberSequence is a valid permutation of 1-90
+  if (config.numberSequence.length !== 90) {
+    throw new AppError('INVALID_SEQUENCE', 'Number sequence must contain exactly 90 numbers', 400);
+  }
+  const sorted = [...config.numberSequence].sort((a, b) => a - b);
+  for (let i = 0; i < 90; i++) {
+    if (sorted[i] !== i + 1) {
+      throw new AppError('INVALID_SEQUENCE', 'Number sequence must be a permutation of 1-90', 400);
+    }
+  }
+
+  // Validate timestamps
+  if (config.numberTimestamps.length !== 90) {
+    throw new AppError('INVALID_TIMESTAMPS', 'Must provide exactly 90 timestamps', 400);
+  }
+  for (let i = 0; i < 90; i++) {
+    if (config.numberTimestamps[i] < 0) {
+      throw new AppError('INVALID_TIMESTAMPS', 'Timestamps must be non-negative', 400);
+    }
+    if (i > 0 && config.numberTimestamps[i] < config.numberTimestamps[i - 1]) {
+      throw new AppError('INVALID_TIMESTAMPS', `Timestamp at position ${i + 1} is earlier than position ${i}`, 400);
+    }
+  }
+
+  const updated = await prisma.soloWeek.update({
+    where: { id: weekId },
+    data: {
+      game2VideoUrl: config.videoUrl,
+      game2VideoId: config.videoId,
+      game2NumberSequence: config.numberSequence,
+      game2NumberTimestamps: config.numberTimestamps,
+      game2VideoStartTime: config.numberTimestamps[0] || 0,
+      game2ConfiguredAt: new Date(),
+      game2ConfiguredBy: config.configuredBy,
+    },
+  });
+
+  logger.info({ weekId, videoUrl: config.videoUrl }, 'Solo week Game 2 video configured');
   return updated;
 }

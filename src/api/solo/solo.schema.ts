@@ -25,6 +25,7 @@ export const configureWeekSchema = z.object({
   videoUrl: z.string().url(),
   numberSequence: z.array(z.number().int().min(1).max(90)).length(90),
   numberTimestamps: z.array(z.number().min(0)).length(90),
+  gameNumber: z.number().int().min(1).max(2).optional().default(1),
 });
 
 export type ClaimInput = z.infer<typeof claimSchema>;

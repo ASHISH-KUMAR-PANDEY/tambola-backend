@@ -218,7 +218,7 @@ model SoloWeek {
   status        SoloWeekStatus @default(ACTIVE)
   finalizedAt   DateTime?
 
-  // Video-based number calling configuration
+  // Game 1 — Video-based number calling configuration
   videoUrl         String?              // Full YouTube URL
   videoId          String?              // Extracted YouTube video ID for embed
   numberSequence   Int[]    @default([]) // Shared 1-90 order for the week
@@ -227,6 +227,15 @@ model SoloWeek {
   numberInterval   Float?               // Seconds between each number call
   configuredAt     DateTime?            // When organizer configured this week
   configuredBy     String?              // Organizer userId
+
+  // Game 2 — Separate video config (optional, configured independently)
+  game2VideoUrl         String?
+  game2VideoId          String?
+  game2NumberSequence   Int[]    @default([])
+  game2NumberTimestamps Float[]  @default([])
+  game2VideoStartTime   Float?
+  game2ConfiguredAt     DateTime?
+  game2ConfiguredBy     String?
 
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -242,6 +251,7 @@ model SoloGame {
   id              String         @id @default(uuid())
   userId          String
   weekId          String
+  gameNumber      Int            @default(1)  // 1 = Game 1, 2 = Game 2
   ticket          Json           // 3x9 grid, same format as Player.ticket
   numberSequence  Int[]          // Pre-shuffled 1-90 array
   markedNumbers   Int[]          @default([]) // Numbers user has marked on ticket
@@ -255,7 +265,7 @@ model SoloGame {
   week            SoloWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
   claims          SoloClaim[]
 
-  @@unique([userId, weekId])  // One game per user per week
+  @@unique([userId, weekId, gameNumber])  // One game per user per week per gameNumber
   @@index([userId])
   @@index([weekId])
   @@index([status])
@@ -279,6 +289,7 @@ model SoloWeeklyWinner {
   id                 String      @id @default(uuid())
   weekId             String
   category           WinCategory
+  gameNumber         Int            @default(1)  // 1 = Game 1, 2 = Game 2
   userId             String
   userName           String?
   numberCountAtClaim Int
@@ -287,6 +298,6 @@ model SoloWeeklyWinner {
 
   week               SoloWeek    @relation(fields: [weekId], references: [id], onDelete: Cascade)
 
-  @@unique([weekId, category])  // One winner per category per week
+  @@unique([weekId, category, gameNumber])  // One winner per category per week per game
   @@index([weekId])
 }

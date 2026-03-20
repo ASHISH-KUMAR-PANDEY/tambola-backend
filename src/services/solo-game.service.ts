@@ -1,6 +1,6 @@
 import { prisma, WinCategory } from '../models/index.js';
 import { generateTicket, getRowNumbers, getTicketNumbers } from './ticket.service.js';
-import { getOrCreateCurrentWeek, isSoloGameDay, isWeekConfigured } from './solo-week.service.js';
+import { getOrCreateCurrentWeek, isSoloGameDay, isWeekConfigured, isGame2Configured } from './solo-week.service.js';
 import { AppError } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
 
@@ -18,22 +18,73 @@ export function generateNumberSequence(): number[] {
 
 /**
  * Starts a new solo game for the user.
+ * gameNumber=1: standard Game 1 (existing logic)
+ * gameNumber=2: Game 2 (requires Game 1 completed + 24hr cooldown + Game 2 configured)
  */
-export async function startSoloGame(userId: string) {
+export async function startSoloGame(userId: string, gameNumber: number = 1) {
   if (!isSoloGameDay()) {
     throw new AppError('SUNDAY_NO_GAMES', 'Solo games cannot be started on Sunday. Check back Monday!', 400);
   }
 
   const week = await getOrCreateCurrentWeek();
 
-  // Check if week is configured with video data
+  if (gameNumber === 2) {
+    // Game 2 validation
+    if (!isGame2Configured(week)) {
+      throw new AppError('GAME2_NOT_CONFIGURED', 'Game 2 has not been configured for this week.', 400);
+    }
+
+    // Game 1 must be completed
+    const game1 = await prisma.soloGame.findUnique({
+      where: { userId_weekId_gameNumber: { userId, weekId: week.id, gameNumber: 1 } },
+    });
+    if (!game1 || game1.status !== 'COMPLETED') {
+      throw new AppError('GAME1_NOT_COMPLETED', 'You must complete Game 1 before playing Game 2.', 400);
+    }
+
+    // 24-hour cooldown check
+    if (game1.completedAt) {
+      const cooldownEnd = new Date(game1.completedAt.getTime() + 24 * 60 * 60 * 1000);
+      if (new Date() < cooldownEnd) {
+        throw new AppError('COOLDOWN_ACTIVE', 'Game 2 is still locked. Please wait for the cooldown to expire.', 400);
+      }
+    }
+
+    // Check if Game 2 already exists
+    const existingGame2 = await prisma.soloGame.findUnique({
+      where: { userId_weekId_gameNumber: { userId, weekId: week.id, gameNumber: 2 } },
+    });
+    if (existingGame2) {
+      throw new AppError('ALREADY_PLAYED', 'You have already started Game 2 this week', 409);
+    }
+
+    const ticket = generateTicket();
+    const numberSequence = week.game2NumberSequence;
+
+    const game = await prisma.soloGame.create({
+      data: {
+        userId,
+        weekId: week.id,
+        gameNumber: 2,
+        ticket: ticket as any,
+        numberSequence,
+        status: 'IN_PROGRESS',
+      },
+      include: { claims: true, week: true },
+    });
+
+    logger.info({ userId, soloGameId: game.id, weekId: week.id, gameNumber: 2 }, 'Solo Game 2 started');
+    return game;
+  }
+
+  // Game 1 (existing logic)
   if (!isWeekConfigured(week)) {
     throw new AppError('WEEK_NOT_CONFIGURED', 'This week has not been set up yet. Please wait for the organizer to configure the game.', 400);
   }
 
-  // Check if user already has a game this week
+  // Check if user already has a Game 1 this week
   const existing = await prisma.soloGame.findUnique({
-    where: { userId_weekId: { userId, weekId: week.id } },
+    where: { userId_weekId_gameNumber: { userId, weekId: week.id, gameNumber: 1 } },
   });
 
   if (existing) {
@@ -48,6 +99,7 @@ export async function startSoloGame(userId: string) {
     data: {
       userId,
       weekId: week.id,
+      gameNumber: 1,
       ticket: ticket as any,
       numberSequence,
       status: 'IN_PROGRESS',
@@ -157,17 +209,22 @@ function validateClaimPattern(
 }
 
 /**
- * Gets user's current week game (for resume or completed view).
+ * Gets user's current week games (Game 1 and optionally Game 2).
  */
-export async function getUserCurrentWeekGame(userId: string) {
+export async function getUserCurrentWeekGames(userId: string) {
   const week = await getOrCreateCurrentWeek();
 
-  const game = await prisma.soloGame.findUnique({
-    where: { userId_weekId: { userId, weekId: week.id } },
+  const game1 = await prisma.soloGame.findUnique({
+    where: { userId_weekId_gameNumber: { userId, weekId: week.id, gameNumber: 1 } },
     include: { claims: true },
   });
 
-  return { game, week };
+  const game2 = await prisma.soloGame.findUnique({
+    where: { userId_weekId_gameNumber: { userId, weekId: week.id, gameNumber: 2 } },
+    include: { claims: true },
+  });
+
+  return { game1, game2, week };
 }
 
 /**

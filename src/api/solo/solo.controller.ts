@@ -4,7 +4,7 @@ import { prisma } from '../../models/index.js';
 import {
   startSoloGame,
   validateAndRecordClaim,
-  getUserCurrentWeekGame,
+  getUserCurrentWeekGames,
   updateGameProgress,
   completeGame,
 } from '../../services/solo-game.service.js';
@@ -13,7 +13,9 @@ import {
   isSoloGameDay,
   isSunday,
   isWeekConfigured,
+  isGame2Configured,
   configureSoloWeekVideo,
+  configureSoloWeekGame2Video,
   extractYouTubeVideoId,
   finalizeWeek as finalizeWeekService,
 } from '../../services/solo-week.service.js';
@@ -35,6 +37,8 @@ function getUserId(request: FastifyRequest): string {
 export async function getCurrentWeek(request: FastifyRequest, reply: FastifyReply) {
   const week = await getOrCreateCurrentWeek();
   const user = (request as AuthenticatedRequest).user;
+  const { userId: queryUserId } = request.query as { userId?: string };
+  const resolvedUserId = user?.userId || queryUserId;
 
   // Count players this week
   const playerCount = await prisma.soloGame.count({
@@ -44,14 +48,49 @@ export async function getCurrentWeek(request: FastifyRequest, reply: FastifyRepl
   // Check if user has played
   let hasPlayed = false;
   let gameStatus = null;
-  if (user?.userId) {
-    const game = await prisma.soloGame.findUnique({
-      where: { userId_weekId: { userId: user.userId, weekId: week.id } },
-      select: { status: true },
+  let game2Status: {
+    available: boolean;
+    cooldownEndsAt: string | null;
+    hasPlayed: boolean;
+    gameStatus: string | null;
+  } = {
+    available: false,
+    cooldownEndsAt: null,
+    hasPlayed: false,
+    gameStatus: null,
+  };
+
+  if (resolvedUserId) {
+    const game1 = await prisma.soloGame.findUnique({
+      where: { userId_weekId_gameNumber: { userId: resolvedUserId, weekId: week.id, gameNumber: 1 } },
+      select: { status: true, completedAt: true },
     });
-    if (game) {
+    if (game1) {
       hasPlayed = true;
-      gameStatus = game.status;
+      gameStatus = game1.status;
+
+      // Compute Game 2 status
+      if (game1.status === 'COMPLETED' && isGame2Configured(week)) {
+        const game2 = await prisma.soloGame.findUnique({
+          where: { userId_weekId_gameNumber: { userId: resolvedUserId, weekId: week.id, gameNumber: 2 } },
+          select: { status: true },
+        });
+
+        if (game2) {
+          game2Status.hasPlayed = true;
+          game2Status.gameStatus = game2.status;
+        }
+
+        // Compute cooldown
+        if (game1.completedAt) {
+          const cooldownEnd = new Date(game1.completedAt.getTime() + 24 * 60 * 60 * 1000);
+          if (new Date() >= cooldownEnd) {
+            game2Status.available = !game2; // Available if not already started
+          } else {
+            game2Status.cooldownEndsAt = cooldownEnd.toISOString();
+          }
+        }
+      }
     }
   }
 
@@ -65,6 +104,7 @@ export async function getCurrentWeek(request: FastifyRequest, reply: FastifyRepl
       videoUrl: week.videoUrl,
       videoId: week.videoId,
       isConfigured: isWeekConfigured(week),
+      isGame2Configured: isGame2Configured(week),
     },
     stats: {
       playerCount,
@@ -72,6 +112,7 @@ export async function getCurrentWeek(request: FastifyRequest, reply: FastifyRepl
     userStatus: {
       hasPlayed,
       gameStatus,
+      game2Status,
     },
     flags: {
       isSoloGameDay: isSoloGameDay(),
@@ -85,18 +126,27 @@ export async function getCurrentWeek(request: FastifyRequest, reply: FastifyRepl
  */
 export async function startGame(request: FastifyRequest, reply: FastifyReply) {
   const userId = getUserId(request);
-  const game = await startSoloGame(userId);
+  const { gameNumber: gameNumberStr } = request.query as { gameNumber?: string };
+  const gameNumber = gameNumberStr ? parseInt(gameNumberStr, 10) : 1;
+
+  const game = await startSoloGame(userId, gameNumber);
   const week = (game as any).week;
+
+  // Return correct video fields based on game number
+  const videoUrl = gameNumber === 2 ? week?.game2VideoUrl : week?.videoUrl;
+  const videoId = gameNumber === 2 ? week?.game2VideoId : week?.videoId;
+  const numberTimestamps = gameNumber === 2 ? week?.game2NumberTimestamps : week?.numberTimestamps;
 
   return reply.status(201).send({
     soloGameId: game.id,
     weekId: game.weekId,
+    gameNumber: game.gameNumber,
     ticket: game.ticket,
     numberSequence: game.numberSequence,
     status: game.status,
-    videoUrl: week?.videoUrl || null,
-    videoId: week?.videoId || null,
-    numberTimestamps: week?.numberTimestamps || [],
+    videoUrl: videoUrl || null,
+    videoId: videoId || null,
+    numberTimestamps: numberTimestamps || [],
   });
 }
 
@@ -135,14 +185,62 @@ export async function claimCategory(request: FastifyRequest, reply: FastifyReply
  */
 export async function getMyGame(request: FastifyRequest, reply: FastifyReply) {
   const userId = getUserId(request);
-  const { game, week } = await getUserCurrentWeekGame(userId);
+  const { game1, game2, week } = await getUserCurrentWeekGames(userId);
 
-  if (!game) {
+  const formatGame = (game: NonNullable<typeof game1>) => ({
+    id: game.id,
+    weekId: game.weekId,
+    gameNumber: game.gameNumber,
+    ticket: game.ticket,
+    numberSequence: game.numberSequence,
+    markedNumbers: game.markedNumbers,
+    currentIndex: game.currentIndex,
+    status: game.status,
+    startedAt: game.startedAt,
+    completedAt: game.completedAt,
+    claims: game.claims.map(c => ({
+      id: c.id,
+      category: c.category,
+      numberCountAtClaim: c.numberCountAtClaim,
+      claimedAt: c.claimedAt,
+    })),
+  });
+
+  // Compute game2Status for the frontend
+  let game2Status: {
+    available: boolean;
+    cooldownEndsAt: string | null;
+    configured: boolean;
+  } = {
+    available: false,
+    cooldownEndsAt: null,
+    configured: isGame2Configured(week),
+  };
+
+  if (game1?.status === 'COMPLETED' && game1.completedAt && isGame2Configured(week)) {
+    const cooldownEnd = new Date(game1.completedAt.getTime() + 24 * 60 * 60 * 1000);
+    if (new Date() >= cooldownEnd) {
+      game2Status.available = !game2; // Available if not already started
+    } else {
+      game2Status.cooldownEndsAt = cooldownEnd.toISOString();
+    }
+  }
+
+  if (!game1) {
     return reply.send({
       game: null,
+      game1: null,
+      game2: null,
+      game2Status,
       canPlay: isSoloGameDay(),
       isSunday: isSunday(),
       isConfigured: isWeekConfigured(week),
+      videoUrl: week.videoUrl || null,
+      videoId: week.videoId || null,
+      numberTimestamps: week.numberTimestamps || [],
+      game2VideoUrl: week.game2VideoUrl || null,
+      game2VideoId: week.game2VideoId || null,
+      game2NumberTimestamps: week.game2NumberTimestamps || [],
       currentWeek: {
         id: week.id,
         weekStartDate: week.weekStartDate,
@@ -153,26 +251,16 @@ export async function getMyGame(request: FastifyRequest, reply: FastifyReply) {
   }
 
   return reply.send({
-    game: {
-      id: game.id,
-      weekId: game.weekId,
-      ticket: game.ticket,
-      numberSequence: game.numberSequence,
-      markedNumbers: game.markedNumbers,
-      currentIndex: game.currentIndex,
-      status: game.status,
-      startedAt: game.startedAt,
-      completedAt: game.completedAt,
-      claims: game.claims.map(c => ({
-        id: c.id,
-        category: c.category,
-        numberCountAtClaim: c.numberCountAtClaim,
-        claimedAt: c.claimedAt,
-      })),
-    },
+    game: formatGame(game1), // backward compat — Game 1 data
+    game1: formatGame(game1),
+    game2: game2 ? formatGame(game2) : null,
+    game2Status,
     videoUrl: week.videoUrl || null,
     videoId: week.videoId || null,
     numberTimestamps: week.numberTimestamps || [],
+    game2VideoUrl: week.game2VideoUrl || null,
+    game2VideoId: week.game2VideoId || null,
+    game2NumberTimestamps: week.game2NumberTimestamps || [],
     canPlay: false,
     isSunday: isSunday(),
     currentWeek: {
@@ -223,7 +311,8 @@ export async function completeGameEndpoint(request: FastifyRequest, reply: Fasti
  * Weekly leaderboard — live (ACTIVE) or finalized.
  */
 export async function getLeaderboard(request: FastifyRequest, reply: FastifyReply) {
-  const { weekId } = (request.query as any) || {};
+  const { weekId, gameNumber: gameNumberStr } = (request.query as any) || {};
+  const gameNumber = gameNumberStr ? parseInt(gameNumberStr, 10) : 1;
 
   let week;
   if (weekId) {
@@ -234,9 +323,9 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
   }
 
   if (week.status === 'FINALIZED') {
-    // Return finalized winners
+    // Return finalized winners for the specified game number
     const winners = await prisma.soloWeeklyWinner.findMany({
-      where: { weekId: week.id },
+      where: { weekId: week.id, gameNumber },
       orderBy: { category: 'asc' },
     });
 
@@ -259,7 +348,7 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
     });
   }
 
-  // Live leaderboard — best claims per category so far
+  // Live leaderboard — best claims per category for the specified game number
   const categories = ['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE'] as const;
   const leaderboard = [];
 
@@ -267,7 +356,7 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
     const bestClaim = await prisma.soloClaim.findFirst({
       where: {
         category,
-        soloGame: { weekId: week.id },
+        soloGame: { weekId: week.id, gameNumber },
       },
       orderBy: [
         { numberCountAtClaim: 'asc' },
@@ -295,8 +384,8 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
     }
   }
 
-  // Count total players
-  const playerCount = await prisma.soloGame.count({ where: { weekId: week.id } });
+  // Count total players for this game number
+  const playerCount = await prisma.soloGame.count({ where: { weekId: week.id, gameNumber } });
 
   return reply.send({
     week: {
@@ -316,7 +405,8 @@ export async function getLeaderboard(request: FastifyRequest, reply: FastifyRepl
  */
 export async function getCategoryRankings(request: FastifyRequest, reply: FastifyReply) {
   const userId = getUserId(request);
-  const { weekId } = (request.query as any) || {};
+  const { weekId, gameNumber: gameNumberStr } = (request.query as any) || {};
+  const gameNumber = gameNumberStr ? parseInt(gameNumberStr, 10) : 1;
 
   let week;
   if (weekId) {
@@ -332,11 +422,11 @@ export async function getCategoryRankings(request: FastifyRequest, reply: Fastif
   const totalClaimers: Record<string, number> = {};
 
   for (const category of categories) {
-    // Get all claims for this category this week, ordered by best first
+    // Get all claims for this category this week for the specified game number
     const allClaims = await prisma.soloClaim.findMany({
       where: {
         category,
-        soloGame: { weekId: week.id },
+        soloGame: { weekId: week.id, gameNumber },
       },
       orderBy: [
         { numberCountAtClaim: 'asc' },
@@ -425,7 +515,7 @@ export async function configureWeek(request: FastifyRequest, reply: FastifyReply
     throw new AppError('VALIDATION_ERROR', parsed.error.message, 400);
   }
 
-  const { videoUrl, numberSequence, numberTimestamps } = parsed.data;
+  const { videoUrl, numberSequence, numberTimestamps, gameNumber } = parsed.data;
 
   // Extract YouTube video ID
   const videoId = extractYouTubeVideoId(videoUrl);
@@ -434,6 +524,28 @@ export async function configureWeek(request: FastifyRequest, reply: FastifyReply
   }
 
   const week = await getOrCreateCurrentWeek();
+
+  if (gameNumber === 2) {
+    const updated = await configureSoloWeekGame2Video(week.id, {
+      videoUrl,
+      videoId,
+      numberSequence,
+      numberTimestamps,
+      configuredBy: userId,
+    });
+
+    return reply.send({
+      success: true,
+      week: {
+        id: updated.id,
+        game2VideoUrl: updated.game2VideoUrl,
+        game2VideoId: updated.game2VideoId,
+        game2NumberSequence: updated.game2NumberSequence,
+        game2NumberTimestamps: updated.game2NumberTimestamps,
+        game2ConfiguredAt: updated.game2ConfiguredAt,
+      },
+    });
+  }
 
   const updated = await configureSoloWeekVideo(week.id, {
     videoUrl,
@@ -471,6 +583,8 @@ export async function getWeekConfig(request: FastifyRequest, reply: FastifyReply
 
   const gameCount = await prisma.soloGame.count({ where: { weekId: week.id } });
 
+  const game2Count = await prisma.soloGame.count({ where: { weekId: week.id, gameNumber: 2 } });
+
   return reply.send({
     week: {
       id: week.id,
@@ -485,9 +599,20 @@ export async function getWeekConfig(request: FastifyRequest, reply: FastifyReply
       numberInterval: week.numberInterval,
       configuredAt: week.configuredAt,
       configuredBy: week.configuredBy,
+      // Game 2 config
+      game2VideoUrl: week.game2VideoUrl,
+      game2VideoId: week.game2VideoId,
+      game2NumberSequence: week.game2NumberSequence,
+      game2NumberTimestamps: week.game2NumberTimestamps,
+      game2VideoStartTime: week.game2VideoStartTime,
+      game2ConfiguredAt: week.game2ConfiguredAt,
+      game2ConfiguredBy: week.game2ConfiguredBy,
     },
     gameCount,
+    game2Count,
     isConfigured: isWeekConfigured(week),
+    isGame2Configured: isGame2Configured(week),
     canReconfigure: gameCount === 0,
+    canReconfigureGame2: game2Count === 0,
   });
 }
