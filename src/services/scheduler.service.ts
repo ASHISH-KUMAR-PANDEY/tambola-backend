@@ -82,10 +82,19 @@ async function checkAndRevealDailyNumbers(): Promise<void> {
     }
 
     // Calculate how many numbers should have been revealed by now
-    // Day 1 = 15, Day 2 = 30, Day 3 = 45, etc.
-    const startTime = game.startedAt || now;
-    const elapsedMs = now.getTime() - new Date(startTime).getTime();
-    const daysPassed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000)) + 1; // Day 1 starts immediately
+    // Day 1 = creation day (15 numbers released immediately)
+    // Day 2+ = each subsequent midnight IST (12:00 AM IST = 18:30 UTC previous day)
+    const startTime = new Date(game.startedAt || now);
+
+    // Get IST date for start and now (IST = UTC + 5:30)
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const startIST = new Date(startTime.getTime() + IST_OFFSET_MS);
+    const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
+
+    // Day number = difference in IST calendar dates + 1 (day 1 = creation day)
+    const startDay = Math.floor(startIST.getTime() / (24 * 60 * 60 * 1000));
+    const todayDay = Math.floor(nowIST.getTime() / (24 * 60 * 60 * 1000));
+    const daysPassed = todayDay - startDay + 1; // Day 1 starts immediately
     const expectedRevealed = Math.min(90, daysPassed * NUMBERS_PER_DAY);
 
     if (game.revealedCount < expectedRevealed) {

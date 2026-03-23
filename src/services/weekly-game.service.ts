@@ -224,10 +224,14 @@ export async function getWeeklyPlayerState(gameId: string, userId: string) {
   });
 
   // Today's numbers = the batch revealed today
-  // Day 1 = numbers 0-14, Day 2 = 15-29, etc.
-  const startTime = game.startedAt ? new Date(game.startedAt).getTime() : Date.now();
-  const elapsedMs = Date.now() - startTime;
-  const daysPassed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000)); // 0-indexed day
+  // Uses IST midnight boundaries: Day 0 = creation day, Day 1 = next IST midnight, etc.
+  const startTime = game.startedAt ? new Date(game.startedAt) : new Date();
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const startIST = new Date(startTime.getTime() + IST_OFFSET_MS);
+  const nowIST = new Date(Date.now() + IST_OFFSET_MS);
+  const startDay = Math.floor(startIST.getTime() / (24 * 60 * 60 * 1000));
+  const todayDay = Math.floor(nowIST.getTime() / (24 * 60 * 60 * 1000));
+  const daysPassed = todayDay - startDay; // 0-indexed: 0 = creation day
   const todayStart = daysPassed * 15;
   const todayEnd = Math.min((daysPassed + 1) * 15, game.revealedCount);
   const todayNumbers = todayEnd > todayStart
