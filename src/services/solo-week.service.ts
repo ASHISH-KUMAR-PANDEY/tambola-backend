@@ -2,6 +2,7 @@ import { prisma, WinCategory, SoloWeekStatus } from '../models/index.js';
 import type { SoloWeek } from '@prisma/client';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../utils/error.js';
+import { generateOptimizedTicketPool } from './ticket.service.js';
 
 /**
  * Gets the current week bounds (Monday 00:00:00 to Saturday 23:59:59 IST).
@@ -241,6 +242,22 @@ export async function configureSoloWeekVideo(
     },
   });
 
+  // Auto-generate optimized ticket pool for this sequence
+  try {
+    const pool = generateOptimizedTicketPool(config.numberSequence, 300);
+    if (pool.length >= 100) {
+      await prisma.soloWeek.update({
+        where: { id: weekId },
+        data: { ticketPool: pool as any },
+      });
+      logger.info({ weekId, poolSize: pool.length }, 'Generated optimized ticket pool');
+    } else {
+      logger.warn({ weekId, poolSize: pool.length }, 'Ticket pool too small, using random tickets');
+    }
+  } catch (err) {
+    logger.error({ weekId, error: err }, 'Failed to generate ticket pool, will use random tickets');
+  }
+
   logger.info({ weekId, videoUrl: config.videoUrl }, 'Solo week video configured');
   return updated;
 }
@@ -298,6 +315,20 @@ export async function configureSoloWeekGame2Video(
       game2ConfiguredBy: config.configuredBy,
     },
   });
+
+  // Auto-generate optimized ticket pool for Game 2
+  try {
+    const pool = generateOptimizedTicketPool(config.numberSequence, 300);
+    if (pool.length >= 100) {
+      await prisma.soloWeek.update({
+        where: { id: weekId },
+        data: { game2TicketPool: pool as any },
+      });
+      logger.info({ weekId, poolSize: pool.length }, 'Generated Game 2 optimized ticket pool');
+    }
+  } catch (err) {
+    logger.error({ weekId, error: err }, 'Failed to generate Game 2 ticket pool');
+  }
 
   logger.info({ weekId, videoUrl: config.videoUrl }, 'Solo week Game 2 video configured');
   return updated;
