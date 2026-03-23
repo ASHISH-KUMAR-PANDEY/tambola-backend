@@ -112,6 +112,7 @@ import { registrationCardRoutes } from './api/registration-card/registration-car
 import { vipCohortRoutes } from './api/vip-cohort/vip-cohort.routes.js';
 import { weeklyGamesRoutes } from './api/weekly-games/weekly-games.routes.js';
 import { startScheduler } from './services/scheduler.service.js';
+import { soloRoutes } from './api/solo/solo.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
@@ -121,6 +122,7 @@ await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
 await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-livestream' });
 await fastify.register(vipCohortRoutes, { prefix: '/api/v1/vip-cohort' });
 await fastify.register(registrationCardRoutes, { prefix: '/api/v1/registration-card' });
+await fastify.register(soloRoutes, { prefix: '/api/v1/solo' });
 
 // Socket.IO setup
 const io = new SocketIOServer(fastify.server, {
@@ -274,22 +276,35 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Wheel spin event - broadcasts to all clients in game room (including /wheel display)
-  socket.on('wheel:spin', async (payload: { gameId: string; targetNumber: number; spinDuration: number; remainingNumbers: number[]; rotation: number }) => {
+  // Wheel spin event - triggers /wheel display to spin (organizer -> wheel display)
+  socket.on('wheel:spin', async (payload: { gameId: string; remainingNumbers: number[] }) => {
     try {
-      const { gameId, targetNumber, spinDuration, remainingNumbers, rotation } = payload;
-      logger.info({ gameId, targetNumber, spinDuration, remainingCount: remainingNumbers?.length, rotation, socketId: socket.id }, 'Wheel spin event');
+      const { gameId, remainingNumbers } = payload;
+      logger.info({ gameId, remainingCount: remainingNumbers?.length, socketId: socket.id }, 'Wheel spin trigger');
 
-      // Broadcast to all clients in the game room with rotation for exact sync
+      // Broadcast to all clients in the game room - /wheel display will pick the number and spin
       io.to(`game:${gameId}`).emit('wheel:spin', {
         gameId,
-        targetNumber,
-        spinDuration,
         remainingNumbers,
-        rotation,
       });
     } catch (error) {
       logger.error({ error, socketId: socket.id, event: 'wheel:spin' }, 'Wheel spin error');
+    }
+  });
+
+  // Wheel result - when /wheel display picks and spins to a number, it emits the result back
+  socket.on('wheel:result', async (payload: { gameId: string; number: number }) => {
+    try {
+      const { gameId, number } = payload;
+      logger.info({ gameId, number, socketId: socket.id }, 'Wheel result received');
+
+      // Broadcast result to all clients in the game room (organizer will receive this)
+      io.to(`game:${gameId}`).emit('wheel:result', {
+        gameId,
+        number,
+      });
+    } catch (error) {
+      logger.error({ error, socketId: socket.id, event: 'wheel:result' }, 'Wheel result error');
     }
   });
 

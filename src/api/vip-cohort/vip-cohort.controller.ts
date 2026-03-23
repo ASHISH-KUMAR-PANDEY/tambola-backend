@@ -180,16 +180,22 @@ export async function isUserVIP(userId: string): Promise<boolean> {
 }
 
 /**
- * Check if current authenticated user is VIP
+ * Check if a user is VIP
  * API endpoint for frontend to check VIP status
+ * Accepts userId as query parameter (no auth required for mobile app users)
  */
 export async function checkVIPStatus(
-  request: FastifyRequest,
+  request: FastifyRequest<{ Querystring: { userId?: string } }>,
   reply: FastifyReply
 ): Promise<void> {
   try {
-    const authReq = request as AuthenticatedRequest;
-    const userId = authReq.user.userId;
+    // Get userId from query param (for mobile app users without auth)
+    const userId = request.query.userId;
+
+    if (!userId) {
+      reply.status(400).send({ error: 'userId is required' });
+      return;
+    }
 
     const isVIP = await isUserVIP(userId);
 
@@ -198,7 +204,7 @@ export async function checkVIPStatus(
     reply.send({ isVIP });
   } catch (error) {
     logger.error({ error }, 'Failed to check VIP status');
-    // Fail open - return true on errors
-    reply.send({ isVIP: true });
+    // Fail closed - return false on errors
+    reply.send({ isVIP: false });
   }
 }

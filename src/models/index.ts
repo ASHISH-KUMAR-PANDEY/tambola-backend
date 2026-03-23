@@ -6,6 +6,8 @@ export {
   WinCategory,
   QueueStatus,
   UserRole,
+  SoloGameStatus,
+  SoloWeekStatus,
   type User,
   type Game,
   type Player,
@@ -16,6 +18,10 @@ export {
   type PromotionalBanner,
   type YouTubeEmbed,
   type YouTubeLiveStream,
+  type SoloWeek,
+  type SoloGame,
+  type SoloClaim,
+  type SoloWeeklyWinner,
 } from '@prisma/client';
 
 // Re-export for backward compatibility

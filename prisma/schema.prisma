@@ -224,23 +224,25 @@ model RegistrationCard {
   @@index([isActive])
 }
 
-// Solo Game Mode Models (existing tables — preserved)
+// Solo Game Mode Models
 model SoloWeek {
   id            String         @id @default(uuid())
-  weekStartDate DateTime
-  weekEndDate   DateTime
+  weekStartDate DateTime       // Monday 00:00:00 IST
+  weekEndDate   DateTime       // Saturday 23:59:59 IST
   status        SoloWeekStatus @default(ACTIVE)
   finalizedAt   DateTime?
 
-  videoUrl         String?
-  videoId          String?
-  numberSequence   Int[]    @default([])
-  numberTimestamps Float[]  @default([])
-  videoStartTime   Float?
-  numberInterval   Float?
-  configuredAt     DateTime?
-  configuredBy     String?
+  // Game 1 — Video-based number calling configuration
+  videoUrl         String?              // Full YouTube URL
+  videoId          String?              // Extracted YouTube video ID for embed
+  numberSequence   Int[]    @default([]) // Shared 1-90 order for the week
+  numberTimestamps Float[]  @default([]) // Computed timestamp (seconds) per number
+  videoStartTime   Float?               // Seconds into video when 1st number called
+  numberInterval   Float?               // Seconds between each number call
+  configuredAt     DateTime?            // When organizer configured this week
+  configuredBy     String?              // Organizer userId
 
+  // Game 2 — Separate video config (optional, configured independently)
   game2VideoUrl         String?
   game2VideoId          String?
   game2NumberSequence   Int[]    @default([])
@@ -263,12 +265,12 @@ model SoloGame {
   id              String         @id @default(uuid())
   userId          String
   weekId          String
-  gameNumber      Int            @default(1)
-  ticket          Json
-  numberSequence  Int[]
-  markedNumbers   Int[]          @default([])
+  gameNumber      Int            @default(1)  // 1 = Game 1, 2 = Game 2
+  ticket          Json           // 3x9 grid, same format as Player.ticket
+  numberSequence  Int[]          // Pre-shuffled 1-90 array
+  markedNumbers   Int[]          @default([]) // Numbers user has marked on ticket
   status          SoloGameStatus @default(IN_PROGRESS)
-  currentIndex    Int            @default(0)
+  currentIndex    Int            @default(0)  // How far the auto-caller has progressed
   startedAt       DateTime       @default(now())
   completedAt     DateTime?
   createdAt       DateTime       @default(now())
@@ -277,7 +279,7 @@ model SoloGame {
   week            SoloWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
   claims          SoloClaim[]
 
-  @@unique([userId, weekId, gameNumber])
+  @@unique([userId, weekId, gameNumber])  // One game per user per week per gameNumber
   @@index([userId])
   @@index([weekId])
   @@index([status])
@@ -287,12 +289,12 @@ model SoloClaim {
   id                 String      @id @default(uuid())
   soloGameId         String
   category           WinCategory
-  numberCountAtClaim Int
+  numberCountAtClaim Int         // How many numbers had been called (1-indexed)
   claimedAt          DateTime    @default(now())
 
   soloGame           SoloGame    @relation(fields: [soloGameId], references: [id], onDelete: Cascade)
 
-  @@unique([soloGameId, category])
+  @@unique([soloGameId, category])  // One claim per category per game
   @@index([soloGameId])
   @@index([category, numberCountAtClaim])
 }
@@ -301,7 +303,7 @@ model SoloWeeklyWinner {
   id                 String      @id @default(uuid())
   weekId             String
   category           WinCategory
-  gameNumber         Int            @default(1)
+  gameNumber         Int            @default(1)  // 1 = Game 1, 2 = Game 2
   userId             String
   userName           String?
   numberCountAtClaim Int
@@ -310,7 +312,7 @@ model SoloWeeklyWinner {
 
   week               SoloWeek    @relation(fields: [weekId], references: [id], onDelete: Cascade)
 
-  @@unique([weekId, category, gameNumber])
+  @@unique([weekId, category, gameNumber])  // One winner per category per week per game
   @@index([weekId])
 }
 
