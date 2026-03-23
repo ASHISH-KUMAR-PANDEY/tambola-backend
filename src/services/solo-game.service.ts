@@ -1,8 +1,39 @@
 import { prisma, WinCategory } from '../models/index.js';
 import { generateTicket, getRowNumbers, getTicketNumbers } from './ticket.service.js';
+import type { TicketPoolEntry } from './ticket.service.js';
 import { getOrCreateCurrentWeek, isSoloGameDay, isWeekConfigured, isGame2Configured } from './solo-week.service.js';
 import { AppError } from '../utils/error.js';
 import { logger } from '../utils/logger.js';
+import { redis } from '../database/redis.js';
+
+/**
+ * Gets a ticket from the pre-generated optimized pool (round-robin via Redis counter).
+ * Falls back to random generateTicket() if pool doesn't exist.
+ */
+async function getTicketFromPool(weekId: string, gameNumber: number, pool: TicketPoolEntry[] | null): Promise<number[][]> {
+  if (!pool || !Array.isArray(pool) || pool.length === 0) {
+    logger.info({ weekId, gameNumber, ticketSource: 'random_fallback' }, 'No ticket pool, using random ticket');
+    return generateTicket();
+  }
+
+  try {
+    const key = `solo:ticket_pool:${weekId}:${gameNumber}:idx`;
+    const idx = await redis.incr(key);
+    // Set TTL of 8 days on first use
+    if (idx === 1) await redis.expire(key, 8 * 86400);
+    const poolIndex = (idx - 1) % pool.length;
+    const entry = pool[poolIndex];
+    logger.info({
+      weekId, gameNumber, poolIndex, poolSize: pool.length,
+      ticketSource: 'optimized_pool',
+      expected: { e5: entry.e5, tl: entry.tl, ml: entry.ml, bl: entry.bl, fh: entry.fh },
+    }, 'Assigned ticket from optimized pool');
+    return entry.ticket;
+  } catch (err) {
+    logger.error({ weekId, gameNumber, ticketSource: 'random_fallback', error: err }, 'Redis pool counter failed, using random ticket');
+    return generateTicket();
+  }
+}
 
 /**
  * Generates a shuffled sequence of numbers 1-90 using Fisher-Yates.
@@ -58,7 +89,7 @@ export async function startSoloGame(userId: string, gameNumber: number = 1) {
       throw new AppError('ALREADY_PLAYED', 'You have already started Game 2 this week', 409);
     }
 
-    const ticket = generateTicket();
+    const ticket = await getTicketFromPool(week.id, 2, week.game2TicketPool as unknown as TicketPoolEntry[] | null);
     const numberSequence = week.game2NumberSequence;
 
     const game = await prisma.soloGame.create({
@@ -91,7 +122,7 @@ export async function startSoloGame(userId: string, gameNumber: number = 1) {
     throw new AppError('ALREADY_PLAYED', 'You have already played a solo game this week', 409);
   }
 
-  const ticket = generateTicket();
+  const ticket = await getTicketFromPool(week.id, 1, week.ticketPool as unknown as TicketPoolEntry[] | null);
   // Use the week's shared number sequence (from the video) instead of random per-user
   const numberSequence = week.numberSequence;
 
