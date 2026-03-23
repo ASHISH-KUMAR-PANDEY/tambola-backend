@@ -3,10 +3,12 @@ import { revealDailyNumbers } from './weekly-game.service.js';
 import { logger } from '../utils/logger.js';
 
 let schedulerInterval: NodeJS.Timeout | null = null;
+const NUMBERS_PER_DAY = 15;
 
 /**
- * Starts the weekly game scheduler
- * Checks every 60 seconds if any weekly game needs daily numbers revealed
+ * Starts the weekly game scheduler.
+ * Checks every 60s if any weekly game needs its daily batch of 15 numbers revealed.
+ * Numbers are revealed once per day — the frontend handles drip animation.
  */
 export function startScheduler(): void {
   if (schedulerInterval) {
@@ -14,7 +16,7 @@ export function startScheduler(): void {
     return;
   }
 
-  logger.info('Starting weekly game scheduler (checks every 60s)');
+  logger.info('Starting weekly game scheduler (daily batch, checks every 60s)');
 
   schedulerInterval = setInterval(async () => {
     try {
@@ -22,7 +24,7 @@ export function startScheduler(): void {
     } catch (error) {
       logger.error({ error }, 'Scheduler error');
     }
-  }, 60_000); // Check every minute
+  }, 60_000);
 
   // Also run immediately on startup
   checkAndRevealDailyNumbers().catch((error) => {
@@ -42,9 +44,8 @@ export function stopScheduler(): void {
 }
 
 /**
- * Checks all active weekly games and reveals 15 numbers if date has changed
- * Logic: Day 1 = numbers 1-15, Day 2 = 16-30, ..., Day 6 = 76-90
- * Day 7 (Sunday) = result day, no new numbers
+ * Checks all active weekly games and reveals daily batch of 15 numbers
+ * based on how many days have passed since the game started.
  */
 async function checkAndRevealDailyNumbers(): Promise<void> {
   const activeWeeklyGames = await prisma.game.findMany({
@@ -55,10 +56,8 @@ async function checkAndRevealDailyNumbers(): Promise<void> {
     select: {
       id: true,
       revealedCount: true,
-      lastRevealedAt: true,
       resultDate: true,
       startedAt: true,
-      numberSequence: true,
     },
   });
 
@@ -82,25 +81,20 @@ async function checkAndRevealDailyNumbers(): Promise<void> {
       continue;
     }
 
-    // Calculate how many days have passed since game started
-    const startDate = game.startedAt || game.lastRevealedAt || now;
-    const daysSinceStart = Math.floor(
-      (now.getTime() - new Date(startDate).setHours(0, 0, 0, 0)) / (24 * 60 * 60 * 1000)
-    );
+    // Calculate how many numbers should have been revealed by now
+    // Day 1 = 15, Day 2 = 30, Day 3 = 45, etc.
+    const startTime = game.startedAt || now;
+    const elapsedMs = now.getTime() - new Date(startTime).getTime();
+    const daysPassed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000)) + 1; // Day 1 starts immediately
+    const expectedRevealed = Math.min(90, daysPassed * NUMBERS_PER_DAY);
 
-    // Each day reveals 15 numbers, max 6 days (90 numbers)
-    const expectedRevealed = Math.min(daysSinceStart * 15, 90);
-
-    // If we haven't revealed enough numbers for today, reveal them
     if (game.revealedCount < expectedRevealed) {
-      const count = expectedRevealed - game.revealedCount;
-      const revealed = await revealDailyNumbers(game.id, count);
-      if (revealed.length > 0) {
-        logger.info(
-          { gameId: game.id, count: revealed.length, totalRevealed: expectedRevealed, day: daysSinceStart },
-          'Scheduler revealed daily numbers'
-        );
-      }
+      const toReveal = expectedRevealed - game.revealedCount;
+      const revealed = await revealDailyNumbers(game.id, toReveal);
+      logger.info(
+        { gameId: game.id, revealed: revealed.length, totalRevealed: expectedRevealed, day: daysPassed },
+        'Daily batch revealed'
+      );
     }
   }
 }

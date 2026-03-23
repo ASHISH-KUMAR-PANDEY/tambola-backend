@@ -44,6 +44,17 @@ enum GameMode {
   WEEKLY
 }
 
+enum SoloGameStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum SoloWeekStatus {
+  ACTIVE
+  FINALIZED
+}
+
 // Models
 model User {
   id           String   @id @default(uuid())
@@ -211,6 +222,96 @@ model RegistrationCard {
   updatedAt      DateTime @updatedAt
 
   @@index([isActive])
+}
+
+// Solo Game Mode Models (existing tables — preserved)
+model SoloWeek {
+  id            String         @id @default(uuid())
+  weekStartDate DateTime
+  weekEndDate   DateTime
+  status        SoloWeekStatus @default(ACTIVE)
+  finalizedAt   DateTime?
+
+  videoUrl         String?
+  videoId          String?
+  numberSequence   Int[]    @default([])
+  numberTimestamps Float[]  @default([])
+  videoStartTime   Float?
+  numberInterval   Float?
+  configuredAt     DateTime?
+  configuredBy     String?
+
+  game2VideoUrl         String?
+  game2VideoId          String?
+  game2NumberSequence   Int[]    @default([])
+  game2NumberTimestamps Float[]  @default([])
+  game2VideoStartTime   Float?
+  game2ConfiguredAt     DateTime?
+  game2ConfiguredBy     String?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  games         SoloGame[]
+  winners       SoloWeeklyWinner[]
+
+  @@unique([weekStartDate])
+  @@index([status])
+}
+
+model SoloGame {
+  id              String         @id @default(uuid())
+  userId          String
+  weekId          String
+  gameNumber      Int            @default(1)
+  ticket          Json
+  numberSequence  Int[]
+  markedNumbers   Int[]          @default([])
+  status          SoloGameStatus @default(IN_PROGRESS)
+  currentIndex    Int            @default(0)
+  startedAt       DateTime       @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  week            SoloWeek       @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  claims          SoloClaim[]
+
+  @@unique([userId, weekId, gameNumber])
+  @@index([userId])
+  @@index([weekId])
+  @@index([status])
+}
+
+model SoloClaim {
+  id                 String      @id @default(uuid())
+  soloGameId         String
+  category           WinCategory
+  numberCountAtClaim Int
+  claimedAt          DateTime    @default(now())
+
+  soloGame           SoloGame    @relation(fields: [soloGameId], references: [id], onDelete: Cascade)
+
+  @@unique([soloGameId, category])
+  @@index([soloGameId])
+  @@index([category, numberCountAtClaim])
+}
+
+model SoloWeeklyWinner {
+  id                 String      @id @default(uuid())
+  weekId             String
+  category           WinCategory
+  gameNumber         Int            @default(1)
+  userId             String
+  userName           String?
+  numberCountAtClaim Int
+  claimedAt          DateTime
+  createdAt          DateTime    @default(now())
+
+  week               SoloWeek    @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, category, gameNumber])
+  @@index([weekId])
 }
 
 // Weekly game: tracks when a player's pattern completed and when they claimed

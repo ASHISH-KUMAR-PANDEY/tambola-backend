@@ -223,10 +223,16 @@ export async function getWeeklyPlayerState(gameId: string, userId: string) {
     select: { category: true, playerId: true },
   });
 
-  // Calculate today's numbers (the most recent batch of 15)
-  // If 45 revealed: today = index 30-44 (last 15)
-  const todayStartIdx = Math.max(0, game.revealedCount - 15);
-  const todayNumbers = game.numberSequence.slice(todayStartIdx, game.revealedCount);
+  // Today's numbers = the batch revealed today
+  // Day 1 = numbers 0-14, Day 2 = 15-29, etc.
+  const startTime = game.startedAt ? new Date(game.startedAt).getTime() : Date.now();
+  const elapsedMs = Date.now() - startTime;
+  const daysPassed = Math.floor(elapsedMs / (24 * 60 * 60 * 1000)); // 0-indexed day
+  const todayStart = daysPassed * 15;
+  const todayEnd = Math.min((daysPassed + 1) * 15, game.revealedCount);
+  const todayNumbers = todayEnd > todayStart
+    ? game.numberSequence.slice(todayStart, todayEnd)
+    : [];
 
   return {
     game: {
