@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma, GameMode, GameStatus, WinCategory } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
-import { createWeeklyGameSchema, markNumberSchema, claimWinSchema } from './weekly-games.schema.js';
+import { createWeeklyGameSchema, updateWeeklyGameSchema, markNumberSchema, claimWinSchema } from './weekly-games.schema.js';
 import {
   createWeeklyGame,
   joinWeeklyGame,
@@ -277,5 +277,65 @@ export async function results(request: FastifyRequest, reply: FastifyReply): Pro
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError('GET_RESULTS_FAILED', error instanceof Error ? error.message : 'Failed to get results', 500);
+  }
+}
+
+/**
+ * PATCH /api/v1/weekly-games/:gameId/status — Update weekly game (organizer only)
+ */
+export async function updateStatus(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  try {
+    const authReq = request as AuthenticatedRequest;
+    const { gameId } = request.params as { gameId: string };
+    const body = updateWeeklyGameSchema.parse(request.body);
+
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
+    if (game.gameMode !== GameMode.WEEKLY) throw new AppError('NOT_WEEKLY', 'Not a weekly game', 400);
+    if (game.createdBy !== authReq.user.userId) throw new AppError('FORBIDDEN', 'Only game creator can update', 403);
+
+    const updateData: any = {};
+    if (body.status) {
+      updateData.status = body.status;
+      if (body.status === 'COMPLETED' && !game.endedAt) updateData.endedAt = new Date();
+    }
+    if (body.prizes) updateData.prizes = body.prizes;
+
+    const updated = await prisma.game.update({
+      where: { id: gameId },
+      data: updateData,
+      select: { id: true, status: true, prizes: true, startedAt: true, endedAt: true, revealedCount: true, resultDate: true },
+    });
+
+    await reply.send(updated);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('UPDATE_WEEKLY_GAME_FAILED', error instanceof Error ? error.message : 'Failed to update weekly game', 500);
+  }
+}
+
+/**
+ * DELETE /api/v1/weekly-games/:gameId — Delete weekly game (organizer only)
+ */
+export async function remove(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  try {
+    const authReq = request as AuthenticatedRequest;
+    const { gameId } = request.params as { gameId: string };
+
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
+    if (game.gameMode !== GameMode.WEEKLY) throw new AppError('NOT_WEEKLY', 'Not a weekly game', 400);
+    if (game.createdBy !== authReq.user.userId) throw new AppError('FORBIDDEN', 'Only game creator can delete', 403);
+
+    // Cascade delete related records
+    await prisma.weeklyMarkedNumber.deleteMany({ where: { gameId } });
+    await prisma.weeklyPlayerState.deleteMany({ where: { gameId } });
+    await prisma.player.deleteMany({ where: { gameId } });
+    await prisma.game.delete({ where: { id: gameId } });
+
+    await reply.status(204).send();
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('DELETE_WEEKLY_GAME_FAILED', error instanceof Error ? error.message : 'Failed to delete weekly game', 500);
   }
 }
