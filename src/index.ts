@@ -110,10 +110,13 @@ import { youTubeEmbedRoutes } from './api/youtube-embed/youtube-embed.routes.js'
 import { youtubeLivestreamRoutes } from './api/youtube-livestream/youtube-livestream.routes.js';
 import { registrationCardRoutes } from './api/registration-card/registration-card.routes.js';
 import { vipCohortRoutes } from './api/vip-cohort/vip-cohort.routes.js';
+import { weeklyGamesRoutes } from './api/weekly-games/weekly-games.routes.js';
+import { startScheduler } from './services/scheduler.service.js';
 import { soloRoutes } from './api/solo/solo.routes.js';
 
 await fastify.register(authRoutes, { prefix: '/api/v1/auth' });
 await fastify.register(gamesRoutes, { prefix: '/api/v1/games' });
+await fastify.register(weeklyGamesRoutes, { prefix: '/api/v1/weekly-games' });
 await fastify.register(promotionalBannerRoutes, { prefix: '/api/v1/promotional-banner' });
 await fastify.register(youTubeEmbedRoutes, { prefix: '/api/v1/youtube-embed' });
 await fastify.register(youtubeLivestreamRoutes, { prefix: '/api/v1/youtube-livestream' });
@@ -454,6 +457,9 @@ printLoggingConfig();
 try {
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   logger.info(`Server running on http://localhost:${PORT}`);
+
+  // Start weekly game scheduler
+  startScheduler();
 } catch (error) {
   logger.error({ error }, 'Failed to start server');
   process.exit(1);

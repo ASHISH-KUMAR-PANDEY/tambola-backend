@@ -2,6 +2,7 @@
 export { prisma } from '../database/client.js';
 export {
   GameStatus,
+  GameMode,
   WinCategory,
   QueueStatus,
   UserRole,
@@ -12,6 +13,8 @@ export {
   type Player,
   type Winner,
   type PrizeQueue,
+  type WeeklyPlayerState,
+  type WeeklyMarkedNumber,
   type PromotionalBanner,
   type YouTubeEmbed,
   type YouTubeLiveStream,
