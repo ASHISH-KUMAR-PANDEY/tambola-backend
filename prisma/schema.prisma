@@ -242,6 +242,10 @@ model SoloWeek {
   configuredAt     DateTime?            // When organizer configured this week
   configuredBy     String?              // Organizer userId
 
+  // Pre-generated optimized ticket pool (500 tickets co-designed with number sequence)
+  ticketPool        Json?              // Array of {ticket, e5, tl, ml, bl, fh} objects
+  game2TicketPool   Json?              // Same for Game 2
+
   // Game 2 — Separate video config (optional, configured independently)
   game2VideoUrl         String?
   game2VideoId          String?
