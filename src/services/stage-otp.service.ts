@@ -14,8 +14,9 @@ interface StageGetOTPRequest {
 interface StageGetOTPResponse {
   responseCode: number;
   data?: {
-    id: string; // Used for OTP verification
+    _id: string; // Used for OTP verification (Stage returns _id, not id)
     toastMessage?: string;
+    isNewUser?: boolean;
   };
   responseMessage?: string;
 }
@@ -45,8 +46,12 @@ class StageOTPService {
   private baseUrl: string;
 
   constructor() {
-    // Use Stage's production API
-    this.baseUrl = process.env.STAGE_API_BASE_URL || 'https://api.stage.in';
+    // Stage's production API lives at stageapi.stage.in (NOT api.stage.in,
+    // which returns a 502 Cloudflare LB error). Hardcoded default so a stale
+    // STAGE_API_BASE_URL env var on the host cannot silently break OTP again.
+    this.baseUrl = process.env.STAGE_API_BASE_URL && process.env.STAGE_API_BASE_URL !== 'https://api.stage.in'
+      ? process.env.STAGE_API_BASE_URL
+      : 'https://stageapi.stage.in';
   }
 
   /**
@@ -81,11 +86,11 @@ class StageOTPService {
 
       const data = await response.json() as StageGetOTPResponse;
 
-      if (data.responseCode === 200 && data.data?.id) {
+      if (data.responseCode === 200 && data.data?._id) {
         console.log(`[StageOTP] OTP sent successfully to ${mobileNumber} via Stage API`);
         return {
           success: true,
-          otpId: data.data.id, // Stage's OTP session ID
+          otpId: data.data._id, // Stage's OTP session ID (returned as _id)
         };
       } else {
         console.error('[StageOTP] Failed to send OTP:', data.responseMessage);
