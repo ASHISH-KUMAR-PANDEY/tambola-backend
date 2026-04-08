@@ -7,6 +7,7 @@ import {
   getUserCurrentWeekGames,
   updateGameProgress,
   completeGame,
+  mergeAnonymousGamesIntoUser,
 } from '../../services/solo-game.service.js';
 import {
   getOrCreateCurrentWeek,
@@ -615,6 +616,33 @@ export async function getWeekConfig(request: FastifyRequest, reply: FastifyReply
     canReconfigure: gameCount === 0,
     canReconfigureGame2: game2Count === 0,
   });
+}
+
+/**
+ * POST /api/v1/solo/merge-anonymous?userId=<real_user_id>
+ * Body: { anonymousUserId: "anon_<uuid>" }
+ * Merges SoloGame rows from an anonymous user into a real user after login.
+ */
+export async function mergeAnonymousSoloGames(request: FastifyRequest, reply: FastifyReply) {
+  const realUserId = getUserId(request);
+  if (realUserId.startsWith('anon_')) {
+    throw new AppError('VALIDATION_ERROR', 'userId query parameter must not be an anonymous id', 400);
+  }
+
+  const body = (request.body ?? {}) as { anonymousUserId?: string };
+  const anonymousUserId = body.anonymousUserId;
+  if (!anonymousUserId || typeof anonymousUserId !== 'string') {
+    throw new AppError('VALIDATION_ERROR', 'anonymousUserId is required', 400);
+  }
+  if (!anonymousUserId.startsWith('anon_')) {
+    throw new AppError('VALIDATION_ERROR', 'anonymousUserId must start with anon_', 400);
+  }
+  if (anonymousUserId === realUserId) {
+    throw new AppError('VALIDATION_ERROR', 'anonymousUserId must differ from userId', 400);
+  }
+
+  const result = await mergeAnonymousGamesIntoUser(realUserId, anonymousUserId);
+  return reply.send(result);
 }
 
 /**

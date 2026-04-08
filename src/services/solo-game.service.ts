@@ -306,3 +306,84 @@ export async function completeGame(
 
   logger.info({ soloGameId, userId }, 'Solo game completed');
 }
+
+/**
+ * 3-stage funnel support: merges all SoloGame rows owned by an anonymous
+ * user (prefix `anon_`) into a real tambola user's account.
+ *
+ * Called by MobileOTPLogin after a successful OTP verification when the
+ * user came through the LoginWall. SoloClaim rows reference SoloGame.id
+ * (not SoloGame.userId) so they ride along automatically — no explicit
+ * update needed on SoloClaim.
+ *
+ * Conflict handling: if the real user already has a game for the same
+ * (weekId, gameNumber) combination (e.g. they logged in before as another
+ * anon and played, then logged in again), the @@unique constraint would
+ * reject the update. We drop the anon game silently in that case — the
+ * real user's existing game wins. Returns counts of merged vs dropped.
+ *
+ * Plan: /Users/stageadmin/.claude/plans/merry-hatching-prism.md
+ */
+export async function mergeAnonymousGamesIntoUser(
+  realUserId: string,
+  anonymousUserId: string
+): Promise<{ mergedGames: number; droppedGames: number }> {
+  // Paranoid validation in the service too — the controller also validates
+  // but belt-and-suspenders prevents accidental misuse from other callers.
+  if (!realUserId || realUserId.startsWith('anon_')) {
+    throw new AppError('VALIDATION_ERROR', 'realUserId must not start with anon_', 400);
+  }
+  if (!anonymousUserId || !anonymousUserId.startsWith('anon_')) {
+    throw new AppError('VALIDATION_ERROR', 'anonymousUserId must start with anon_', 400);
+  }
+  if (realUserId === anonymousUserId) {
+    throw new AppError('VALIDATION_ERROR', 'realUserId and anonymousUserId must differ', 400);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const anonGames = await tx.soloGame.findMany({
+      where: { userId: anonymousUserId },
+      select: { id: true, weekId: true, gameNumber: true },
+    });
+
+    let mergedGames = 0;
+    let droppedGames = 0;
+
+    for (const game of anonGames) {
+      // Check for conflict with an existing real-user game for the same
+      // (weekId, gameNumber). The compound unique enforces at most one.
+      const existing = await tx.soloGame.findUnique({
+        where: {
+          userId_weekId_gameNumber: {
+            userId: realUserId,
+            weekId: game.weekId,
+            gameNumber: game.gameNumber,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        // Real user already has a game here — drop the anon one. SoloClaim
+        // rows CASCADE-delete with SoloGame per the schema's onDelete.
+        await tx.soloGame.delete({ where: { id: game.id } });
+        droppedGames++;
+      } else {
+        // Re-key the game to the real user. SoloClaim rows ride along via
+        // their FK to SoloGame.id (not SoloGame.userId).
+        await tx.soloGame.update({
+          where: { id: game.id },
+          data: { userId: realUserId },
+        });
+        mergedGames++;
+      }
+    }
+
+    logger.info(
+      { realUserId, anonymousUserId, mergedGames, droppedGames },
+      'Merged anonymous solo games into real user'
+    );
+
+    return { mergedGames, droppedGames };
+  });
+}

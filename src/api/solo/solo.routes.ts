@@ -14,6 +14,7 @@ export async function soloRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/my-game', soloController.getMyGame);
   fastify.patch('/update-progress', soloController.updateProgress);
   fastify.post('/complete-game', soloController.completeGameEndpoint);
+  fastify.post('/merge-anonymous', soloController.mergeAnonymousSoloGames);
 
   // Admin/Organizer routes (require JWT auth)
   fastify.post('/finalize-week', { onRequest: authMiddleware }, soloController.finalizeWeekEndpoint);
