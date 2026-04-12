@@ -19,4 +19,10 @@ export async function gamesRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete('/:gameId', { onRequest: authMiddleware }, gamesController.deleteGame);
   fastify.post('/cleanup', { onRequest: authMiddleware }, cleanupOldGames);
   fastify.post('/delete-all', { onRequest: authMiddleware }, deleteAllGames);
+
+  // Fixed winners (organizer only)
+  fastify.post('/:gameId/fixed-winners', { onRequest: authMiddleware }, gamesController.setFixedWinners);
+  fastify.get('/:gameId/fixed-winners', { onRequest: authMiddleware }, gamesController.getFixedWinners);
+  fastify.delete('/:gameId/fixed-winners', { onRequest: authMiddleware }, gamesController.deleteFixedWinners);
+  fastify.delete('/:gameId/fixed-winners/:category', { onRequest: authMiddleware }, gamesController.deleteFixedWinnerCategory);
 }

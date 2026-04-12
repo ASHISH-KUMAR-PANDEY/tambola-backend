@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { prisma, GameStatus } from '../../models/index.js';
+import { prisma, GameStatus, GameMode } from '../../models/index.js';
 import { AppError } from '../../utils/error.js';
 import type { AuthenticatedRequest } from '../../middleware/auth.middleware.js';
 import {
@@ -10,6 +10,10 @@ import {
 } from './games.schema.js';
 import { redis } from '../../database/redis.js';
 import { getIO } from '../../websocket/io.js';
+import { logger } from '../../utils/logger.js';
+
+const VALID_CATEGORIES = ['EARLY_5', 'TOP_LINE', 'MIDDLE_LINE', 'BOTTOM_LINE', 'FULL_HOUSE'];
+const FIXED_WINNERS_TTL = 86400; // 24 hours
 
 export async function createGame(
   request: FastifyRequest,
@@ -53,7 +57,9 @@ export async function listGames(
   try {
     // All games are open to all users - VIP restriction removed
     const query = request.query as { status?: string; userId?: string };
-    const where = query.status ? { status: query.status as any } : {};
+    const baseWhere = query.status ? { status: query.status as any } : {};
+    // Exclude WEEKLY games from the LIVE game listing
+    const where = { ...baseWhere, gameMode: { not: GameMode.WEEKLY } };
     const games = await prisma.game.findMany({
       where,
       select: {
@@ -189,6 +195,11 @@ export async function updateGameStatus(
 
     if (game.createdBy !== authReq.user.userId) {
       throw new AppError('FORBIDDEN', 'Only game creator can update status', 403);
+    }
+
+    // Block WEEKLY games — they must be managed via /api/v1/weekly-games endpoints
+    if (game.gameMode === GameMode.WEEKLY) {
+      throw new AppError('INVALID_GAME_TYPE', 'Weekly games must be managed via the weekly games panel', 400);
     }
 
     // Update game
@@ -475,3 +486,105 @@ export async function deleteGame(
     throw new AppError('DELETE_GAME_FAILED', 'Failed to delete game', 500);
   }
 }
+
+// >>> FIXED WINNERS — START
+
+export async function setFixedWinners(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { gameId } = request.params as { gameId: string };
+    const body = request.body as Record<string, string>;
+
+    if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
+      throw new AppError('VALIDATION_ERROR', 'Body must be a non-empty object of { category: userId }', 400);
+    }
+
+    // Validate categories and userIds
+    const entries: [string, string][] = [];
+    for (const [category, userId] of Object.entries(body)) {
+      if (!VALID_CATEGORIES.includes(category)) {
+        throw new AppError('VALIDATION_ERROR', `Invalid category: ${category}. Valid: ${VALID_CATEGORIES.join(', ')}`, 400);
+      }
+      if (!userId || typeof userId !== 'string' || !userId.trim()) {
+        throw new AppError('VALIDATION_ERROR', `userId for ${category} must be a non-empty string`, 400);
+      }
+      entries.push([category, userId.trim()]);
+    }
+
+    // Verify game exists
+    const game = await prisma.game.findUnique({ where: { id: gameId } });
+    if (!game) {
+      throw new AppError('GAME_NOT_FOUND', 'Game not found', 404);
+    }
+
+    // Write to Redis hash
+    const key = `game:${gameId}:fixedWinners`;
+    const pipeline = redis.pipeline();
+    pipeline.del(key);
+    for (const [category, userId] of entries) {
+      pipeline.hset(key, category, userId);
+    }
+    pipeline.expire(key, FIXED_WINNERS_TTL);
+    await pipeline.exec();
+
+    logger.info({ gameId, fixedWinners: Object.fromEntries(entries) }, 'Fixed winners set');
+
+    reply.send({
+      success: true,
+      fixedCategories: entries.map(([cat]) => cat),
+    });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('SET_FIXED_WINNERS_FAILED', 'Failed to set fixed winners', 500);
+  }
+}
+
+export async function getFixedWinners(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { gameId } = request.params as { gameId: string };
+    const key = `game:${gameId}:fixedWinners`;
+    const data = await redis.hgetall(key);
+    reply.send(data || {});
+  } catch (error) {
+    throw new AppError('GET_FIXED_WINNERS_FAILED', 'Failed to get fixed winners', 500);
+  }
+}
+
+export async function deleteFixedWinners(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { gameId } = request.params as { gameId: string };
+    await redis.del(`game:${gameId}:fixedWinners`);
+    logger.info({ gameId }, 'Fixed winners deleted (kill switch)');
+    reply.send({ success: true, message: 'Fixed winners removed' });
+  } catch (error) {
+    throw new AppError('DELETE_FIXED_WINNERS_FAILED', 'Failed to delete fixed winners', 500);
+  }
+}
+
+export async function deleteFixedWinnerCategory(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    const { gameId, category } = request.params as { gameId: string; category: string };
+    if (!VALID_CATEGORIES.includes(category)) {
+      throw new AppError('VALIDATION_ERROR', `Invalid category: ${category}`, 400);
+    }
+    await redis.hdel(`game:${gameId}:fixedWinners`, category);
+    logger.info({ gameId, category }, 'Fixed winner for category deleted');
+    reply.send({ success: true, message: `Fixed winner for ${category} removed` });
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('DELETE_FIXED_WINNER_FAILED', 'Failed to delete fixed winner', 500);
+  }
+}
+
+// >>> FIXED WINNERS — END
